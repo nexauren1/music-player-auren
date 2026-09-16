@@ -44,10 +44,30 @@ jobs:
       - name: Prepare release keystore
         env:
           AUREN_KEYSTORE_B64: ${{ secrets.AUREN_KEYSTORE_B64 }}
+          AUREN_STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
         run: |
           test -n "$AUREN_KEYSTORE_B64"
-          echo "$AUREN_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/auren-release.keystore"
-          test -s "$RUNNER_TEMP/auren-release.keystore"
+          KEYSTORE="$RUNNER_TEMP/auren-release.keystore"
+          CLEAN_B64=$(printf '%s' "$AUREN_KEYSTORE_B64" | tr -d '[:space:]')
+          printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+
+          if ! keytool -list -keystore "$KEYSTORE" \
+              -storepass "$AUREN_STORE_PASS" >/dev/null 2>&1; then
+            if printf '%s' "$CLEAN_B64" | base64 --decode 2>/dev/null \
+                | base64 --decode > "$KEYSTORE.second" 2>/dev/null; then
+              if keytool -list -keystore "$KEYSTORE.second" \
+                  -storepass "$AUREN_STORE_PASS" >/dev/null 2>&1; then
+                mv "$KEYSTORE.second" "$KEYSTORE"
+              else
+                rm -f "$KEYSTORE.second"
+              fi
+            fi
+          fi
+
+          keytool -list -keystore "$KEYSTORE" \
+            -storepass "$AUREN_STORE_PASS" >/dev/null
+          echo "Release keystore validated successfully."
 
       - name: Build signed release APK
         env:
