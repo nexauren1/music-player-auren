@@ -23,6 +23,9 @@ jobs:
       - name: Apply Auren UI enhancements
         run: python3 scripts/enhance_ui.py
 
+      - name: Fix player behavior and active track state
+        run: python3 scripts/fix_player_behavior.py
+
       - name: Verify and repair playlist helpers
         run: python3 scripts/fix_playlist_build.py
 
