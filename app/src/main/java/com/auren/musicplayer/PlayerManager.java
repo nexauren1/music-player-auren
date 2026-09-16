@@ -12,6 +12,7 @@ public final class PlayerManager {
 
     private static MediaPlayer player;
     private static Song currentSong;
+    private static Song[] queue = new Song[0];
     private static Listener listener;
     private static boolean shuffle;
     private static boolean repeat;
@@ -28,8 +29,16 @@ public final class PlayerManager {
         return currentSong;
     }
 
+    public static Song[] getQueue() {
+        return queue.clone();
+    }
+
     public static boolean isPlaying() {
-        return player != null && player.isPlaying();
+        try {
+            return player != null && player.isPlaying();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static boolean isShuffle() {
@@ -56,7 +65,13 @@ public final class PlayerManager {
         }
     }
 
+    public static void setQueue(Song[] songs) {
+        queue = songs == null ? new Song[0] : songs.clone();
+        notifyChanged();
+    }
+
     public static void play(Context context, Song song) {
+        if (song == null || song.uri == null) return;
         release();
         currentSong = song;
         try {
@@ -67,15 +82,7 @@ public final class PlayerManager {
                 mp.start();
                 notifyChanged();
             });
-            player.setOnCompletionListener(mp -> {
-                if (repeat) {
-                    mp.seekTo(0);
-                    mp.start();
-                    notifyChanged();
-                } else {
-                    notifyChanged();
-                }
-            });
+            player.setOnCompletionListener(mp -> handleCompletion(context));
             player.setOnErrorListener((mp, what, extra) -> {
                 release();
                 notifyChanged();
@@ -89,58 +96,69 @@ public final class PlayerManager {
         }
     }
 
-    public static void toggle() {
-        if (player == null) {
-            return;
+    private static void handleCompletion(Context context) {
+        if (repeat && player != null) {
+            try {
+                player.seekTo(0);
+                player.start();
+                notifyChanged();
+                return;
+            } catch (Exception ignored) {
+            }
         }
-        if (player.isPlaying()) {
-            player.pause();
+        if (queue.length > 1) {
+            next(context, queue);
         } else {
-            player.start();
+            notifyChanged();
         }
-        notifyChanged();
+    }
+
+    public static void toggle() {
+        if (player == null) return;
+        try {
+            if (player.isPlaying()) player.pause();
+            else player.start();
+            notifyChanged();
+        } catch (Exception ignored) {
+        }
     }
 
     public static void seekTo(int position) {
-        if (player == null) {
-            return;
-        }
+        if (player == null) return;
         try {
             player.seekTo(position);
         } catch (Exception ignored) {
         }
     }
 
-    public static void next(Context context, Song[] queue) {
-        if (queue == null || queue.length == 0) {
-            return;
-        }
-        int index = indexOf(queue, currentSong);
-        if (shuffle && queue.length > 1) {
-            int next;
+    public static void next(Context context, Song[] songs) {
+        Song[] source = songs == null ? queue : songs;
+        if (source.length == 0) return;
+        queue = source.clone();
+        int index = indexOf(source, currentSong);
+        int next;
+        if (shuffle && source.length > 1) {
             do {
-                next = (int) (Math.random() * queue.length);
+                next = (int) (Math.random() * source.length);
             } while (next == index);
-            play(context, queue[next]);
-            return;
+        } else {
+            next = (index + 1) % source.length;
         }
-        play(context, queue[(index + 1) % queue.length]);
+        play(context, source[next]);
     }
 
-    public static void previous(Context context, Song[] queue) {
-        if (queue == null || queue.length == 0) {
-            return;
-        }
+    public static void previous(Context context, Song[] songs) {
+        Song[] source = songs == null ? queue : songs;
+        if (source.length == 0) return;
+        queue = source.clone();
         if (getPosition() > 3000) {
             seekTo(0);
             return;
         }
-        int index = indexOf(queue, currentSong);
+        int index = indexOf(source, currentSong);
         int previous = index - 1;
-        if (previous < 0) {
-            previous = queue.length - 1;
-        }
-        play(context, queue[previous]);
+        if (previous < 0) previous = source.length - 1;
+        play(context, source[previous]);
     }
 
     public static void setShuffle(boolean value) {
@@ -159,27 +177,24 @@ public final class PlayerManager {
                 player.stop();
             } catch (Exception ignored) {
             }
-            player.release();
+            try {
+                player.release();
+            } catch (Exception ignored) {
+            }
             player = null;
         }
     }
 
-    private static int indexOf(Song[] queue, Song song) {
-        if (song == null) {
-            return 0;
-        }
-        for (int i = 0; i < queue.length; i++) {
-            if (queue[i].uri.equals(song.uri)) {
-                return i;
-            }
+    private static int indexOf(Song[] songs, Song song) {
+        if (song == null) return 0;
+        for (int i = 0; i < songs.length; i++) {
+            if (songs[i].uri.equals(song.uri)) return i;
         }
         return 0;
     }
 
     private static void notifyChanged() {
-        if (listener != null) {
-            listener.onPlayerChanged();
-        }
+        if (listener != null) listener.onPlayerChanged();
     }
 
     public static final class Song {
@@ -189,12 +204,8 @@ public final class PlayerManager {
         public final long duration;
         public final Uri uri;
 
-        public Song(
-                String title,
-                String artist,
-                String album,
-                long duration,
-                Uri uri) {
+        public Song(String title, String artist, String album,
+                    long duration, Uri uri) {
             this.title = title;
             this.artist = artist;
             this.album = album;
