@@ -50,7 +50,10 @@ jobs:
           fi
 
           mkdir -p "$RUNNER_TEMP/auren-signing"
-          echo "$KEYSTORE_B64" | base64 --decode \
+
+          printf '%s' "$KEYSTORE_B64" \
+            | tr -d '[:space:]' \
+            | base64 --decode \
             > "$RUNNER_TEMP/auren-signing/auren-release.keystore"
 
           test -s "$RUNNER_TEMP/auren-signing/auren-release.keystore"
