@@ -165,7 +165,7 @@ public class MainActivity extends ComponentActivity {
 
         card.addView(media);
         card.setOnClickListener(v -> {
-            if (currentTrack != null) showNowPlaying();
+            if (currentTrack != null) openNowPlaying();
         });
         return card;
     }
@@ -496,7 +496,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout item = row();
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(14), dp(8), dp(12), dp(8));
-        item.setBackground(roundDrawable(Color.WHITE, 16));
+        item.setBackgroundColor(Color.WHITE);
 
         TextView iconView = text(icon, 22, R.color.text_secondary);
         iconView.setGravity(Gravity.CENTER);
