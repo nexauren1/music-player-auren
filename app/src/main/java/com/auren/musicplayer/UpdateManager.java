@@ -13,7 +13,10 @@ import androidx.core.content.FileProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -36,11 +39,7 @@ public class UpdateManager {
         public final String apkUrl;
         public final String patchUrl;
 
-        UpdateInfo(
-                String version,
-                String tag,
-                String apkUrl,
-                String patchUrl) {
+        UpdateInfo(String version, String tag, String apkUrl, String patchUrl) {
             this.version = version;
             this.tag = tag;
             this.apkUrl = apkUrl;
@@ -78,20 +77,14 @@ public class UpdateManager {
                 JSONArray assets = release.optJSONArray("assets");
                 String apkUrl = findApk(assets);
                 String current = BuildConfig.VERSION_NAME;
-                String patchUrl = findPatch(
-                        assets,
-                        current,
-                        version);
+                String patchUrl = findPatch(assets, current, version);
 
                 if (version.isEmpty() || apkUrl.isEmpty()) {
                     throw new Exception("No APK release found");
                 }
 
                 UpdateInfo info = new UpdateInfo(
-                        version,
-                        tag,
-                        apkUrl,
-                        patchUrl);
+                        version, tag, apkUrl, patchUrl);
                 ((Activity) context).runOnUiThread(
                         () -> callback.onResult(info));
             } catch (Exception e) {
@@ -118,8 +111,7 @@ public class UpdateManager {
     }
 
     public static void downloadAndInstall(
-            Activity activity,
-            UpdateInfo info) {
+            Activity activity, UpdateInfo info) {
         if (info.hasDelta()) {
             downloadDelta(activity, info);
         } else {
@@ -128,8 +120,7 @@ public class UpdateManager {
     }
 
     private static void downloadDelta(
-            Activity activity,
-            UpdateInfo info) {
+            Activity activity, UpdateInfo info) {
         Toast.makeText(
                 activity,
                 "A baixar atualização otimizada...",
@@ -177,8 +168,7 @@ public class UpdateManager {
             while (true) {
                 try {
                     Thread.sleep(500);
-                    android.database.Cursor result =
-                            manager.query(query);
+                    android.database.Cursor result = manager.query(query);
                     if (result == null) continue;
 
                     try {
@@ -211,9 +201,7 @@ public class UpdateManager {
     }
 
     private static void applyDelta(
-            Activity activity,
-            UpdateInfo info,
-            File patch) {
+            Activity activity, UpdateInfo info, File patch) {
         new Thread(() -> {
             File oldApk = new File(
                     activity.getApplicationInfo().sourceDir);
@@ -225,7 +213,16 @@ public class UpdateManager {
             try {
                 if (output.exists()) output.delete();
 
-                Patch.patch(oldApk, output, patch);
+                byte[] oldBytes = readBytes(oldApk);
+                byte[] patchBytes = readBytes(patch);
+
+                FileOutputStream outputStream =
+                        new FileOutputStream(output);
+                try {
+                    Patch.patch(oldBytes, patchBytes, outputStream);
+                } finally {
+                    outputStream.close();
+                }
 
                 if (!output.exists() || output.length() < 100000) {
                     throw new Exception("Invalid patched APK");
@@ -255,9 +252,23 @@ public class UpdateManager {
         }).start();
     }
 
+    private static byte[] readBytes(File file) throws Exception {
+        InputStream input = new FileInputStream(file);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int length;
+        try {
+            while ((length = input.read(buffer)) != -1) {
+                output.write(buffer, 0, length);
+            }
+        } finally {
+            input.close();
+        }
+        return output.toByteArray();
+    }
+
     private static void downloadApk(
-            Activity activity,
-            UpdateInfo info) {
+            Activity activity, UpdateInfo info) {
         Toast.makeText(
                 activity,
                 "A baixar atualização completa...",
@@ -303,8 +314,7 @@ public class UpdateManager {
             while (true) {
                 try {
                     Thread.sleep(500);
-                    android.database.Cursor result =
-                            manager.query(query);
+                    android.database.Cursor result = manager.query(query);
                     if (result == null) continue;
 
                     try {
@@ -392,9 +402,7 @@ public class UpdateManager {
     }
 
     private static String findPatch(
-            JSONArray assets,
-            String current,
-            String latest) {
+            JSONArray assets, String current, String latest) {
         if (assets == null) return "";
         String expected = "Auren-Music-Player-"
                 + current + "-to-" + latest + ".patch";
