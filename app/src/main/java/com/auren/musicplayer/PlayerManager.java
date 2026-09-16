@@ -2,11 +2,15 @@ package com.auren.musicplayer;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
 
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -48,22 +52,8 @@ public final class PlayerManager {
         return player != null && player.isPlaying();
     }
 
-    public static boolean isPreparing() {
-        return preparing;
-    }
-
-    public static boolean isShuffle() {
-        return shuffle;
-    }
-
-    public static boolean isRepeat() {
-        return repeat;
-    }
-
     public static int getPosition() {
-        if (player == null) {
-            return 0;
-        }
+        if (player == null) return 0;
         return (int) Math.max(0, player.getCurrentPosition());
     }
 
@@ -76,6 +66,20 @@ public final class PlayerManager {
             return currentSong == null ? 0 : (int) currentSong.duration;
         }
         return (int) duration;
+    }
+
+    public static Bitmap getCurrentArtwork() {
+        if (currentSong == null || currentSong.uri == null) return null;
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(appContext, currentSong.uri);
+            byte[] data = retriever.getEmbeddedPicture();
+            if (data != null) return BitmapFactory.decodeByteArray(data, 0, data.length);
+        } catch (Exception ignored) {
+        } finally {
+            try { retriever.release(); } catch (Exception ignored) { }
+        }
+        return null;
     }
 
     public static void setQueue(Song[] songs) {
@@ -97,7 +101,15 @@ public final class PlayerManager {
         notifyChanged();
 
         try {
-            MediaItem item = MediaItem.fromUri(song.uri);
+            MediaMetadata metadata = new MediaMetadata.Builder()
+                    .setTitle(song.title)
+                    .setArtist(song.artist)
+                    .setAlbumTitle(song.album)
+                    .build();
+            MediaItem item = new MediaItem.Builder()
+                    .setUri(song.uri)
+                    .setMediaMetadata(metadata)
+                    .build();
             player.setMediaItem(item);
             player.prepare();
             player.play();
@@ -107,13 +119,10 @@ public final class PlayerManager {
     }
 
     private static void ensurePlayer() {
-        if (player != null) {
-            return;
-        }
+        if (player != null) return;
 
         player = new ExoPlayer.Builder(appContext).build();
-        player.setRepeatMode(
-                Player.REPEAT_MODE_OFF);
+        player.setRepeatMode(Player.REPEAT_MODE_OFF);
         player.setShuffleModeEnabled(shuffle);
 
         player.addListener(new Player.Listener() {
@@ -121,7 +130,6 @@ public final class PlayerManager {
             public void onPlaybackStateChanged(int state) {
                 preparing = state == Player.STATE_BUFFERING
                         || state == Player.STATE_IDLE;
-
                 if (state == Player.STATE_READY) {
                     preparing = false;
                     notifyChanged();
@@ -130,16 +138,12 @@ public final class PlayerManager {
 
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
-                if (isPlaying) {
-                    preparing = false;
-                }
+                if (isPlaying) preparing = false;
                 notifyChanged();
             }
 
             @Override
-            public void onMediaItemTransition(
-                    MediaItem mediaItem,
-                    int reason) {
+            public void onMediaItemTransition(MediaItem item, int reason) {
                 updateCurrentSongFromIndex();
                 notifyChanged();
             }
@@ -147,126 +151,89 @@ public final class PlayerManager {
             @Override
             public void onPlayerError(PlaybackException error) {
                 preparing = false;
-                notifyError(
-                        "Não foi possível reproduzir esta música. "
-                                + "Erro " + error.errorCode + ".");
+                notifyError("Não foi possível reproduzir esta música. "
+                        + "Erro " + error.errorCode + ".");
                 notifyChanged();
             }
         });
     }
 
     private static void updateCurrentSongFromIndex() {
-        if (player == null || queue.length == 0) {
-            return;
-        }
+        if (player == null || queue.length == 0) return;
         int index = player.getCurrentMediaItemIndex();
-        if (index >= 0 && index < queue.length) {
-            currentSong = queue[index];
-        }
+        if (index >= 0 && index < queue.length) currentSong = queue[index];
     }
 
     public static void toggle() {
         if (player == null) {
-            if (currentSong != null && appContext != null) {
-                play(appContext, currentSong);
-            }
+            if (currentSong != null && appContext != null) play(appContext, currentSong);
             return;
         }
-
-        if (player.isPlaying()) {
-            player.pause();
-        } else if (player.getPlaybackState() == Player.STATE_IDLE) {
+        if (player.isPlaying()) player.pause();
+        else if (player.getPlaybackState() == Player.STATE_IDLE) {
             player.prepare();
             player.play();
-        } else {
-            player.play();
-        }
+        } else player.play();
         notifyChanged();
     }
 
     public static void seekTo(int position) {
-        if (player == null) {
-            return;
-        }
-        player.seekTo(Math.max(0, position));
+        if (player != null) player.seekTo(Math.max(0, position));
     }
 
     public static void next(Context context, Song[] songs) {
-        if (context == null) {
-            return;
-        }
+        if (context == null) return;
         Song[] source = songs == null ? queue : songs;
-        if (source.length == 0) {
-            return;
-        }
-
+        if (source.length == 0) return;
         appContext = context.getApplicationContext();
         queue = source.clone();
-
         if (player != null && player.getMediaItemCount() == source.length) {
             player.seekToNextMediaItem();
             player.play();
             return;
         }
-
         int index = indexOf(source, currentSong);
         int next;
         if (shuffle && source.length > 1) {
-            do {
-                next = (int) (Math.random() * source.length);
-            } while (next == index);
-        } else {
-            next = (index + 1) % source.length;
-        }
+            do next = (int) (Math.random() * source.length);
+            while (next == index);
+        } else next = (index + 1) % source.length;
         play(appContext, source[next]);
     }
 
     public static void previous(Context context, Song[] songs) {
-        if (context == null) {
-            return;
-        }
+        if (context == null) return;
         Song[] source = songs == null ? queue : songs;
-        if (source.length == 0) {
-            return;
-        }
-
+        if (source.length == 0) return;
         appContext = context.getApplicationContext();
         queue = source.clone();
-
         if (getPosition() > 3000) {
             seekTo(0);
             return;
         }
-
         if (player != null && player.getMediaItemCount() == source.length) {
             player.seekToPreviousMediaItem();
             player.play();
             return;
         }
-
         int index = indexOf(source, currentSong);
         int previous = index - 1;
-        if (previous < 0) {
-            previous = source.length - 1;
-        }
+        if (previous < 0) previous = source.length - 1;
         play(appContext, source[previous]);
     }
 
     public static void setShuffle(boolean value) {
         shuffle = value;
-        if (player != null) {
-            player.setShuffleModeEnabled(value);
-        }
+        if (player != null) player.setShuffleModeEnabled(value);
         notifyChanged();
     }
 
     public static void setRepeat(boolean value) {
         repeat = value;
         if (player != null) {
-            player.setRepeatMode(
-                    value
-                            ? Player.REPEAT_MODE_ONE
-                            : Player.REPEAT_MODE_OFF);
+            player.setRepeatMode(value
+                    ? Player.REPEAT_MODE_ONE
+                    : Player.REPEAT_MODE_OFF);
         }
         notifyChanged();
     }
@@ -283,69 +250,42 @@ public final class PlayerManager {
     private static void failPlayback(String message) {
         preparing = false;
         if (player != null) {
-            try {
-                player.stop();
-            } catch (Exception ignored) {
-            }
+            try { player.stop(); } catch (Exception ignored) { }
         }
         notifyError(message);
         notifyChanged();
     }
 
     private static void notifyError(String message) {
-        if (listener != null) {
-            listener.onPlayerError(message);
-        }
+        if (listener != null) listener.onPlayerError(message);
     }
 
     private static void startPlaybackService() {
-        if (appContext == null) {
-            return;
-        }
-
-        Intent intent = new Intent(
-                appContext,
-                PlaybackService.class);
+        if (appContext == null) return;
+        Intent intent = new Intent(appContext, PlaybackService.class);
         try {
             if (Build.VERSION.SDK_INT >= 26) {
                 appContext.startForegroundService(intent);
-            } else {
-                appContext.startService(intent);
-            }
-        } catch (Exception ignored) {
-        }
+            } else appContext.startService(intent);
+        } catch (Exception ignored) { }
     }
 
     private static void notifyChanged() {
-        if (listener != null) {
-            listener.onPlayerChanged();
-        }
-
-        if (appContext != null) {
-            Intent intent = new Intent(
-                    appContext,
-                    PlaybackService.class);
-            intent.setAction(PlaybackService.ACTION_UPDATE);
-            try {
-                if (Build.VERSION.SDK_INT >= 26) {
-                    appContext.startForegroundService(intent);
-                } else {
-                    appContext.startService(intent);
-                }
-            } catch (Exception ignored) {
-            }
-        }
+        if (listener != null) listener.onPlayerChanged();
+        if (appContext == null) return;
+        Intent intent = new Intent(appContext, PlaybackService.class);
+        intent.setAction(PlaybackService.ACTION_UPDATE);
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                appContext.startForegroundService(intent);
+            } else appContext.startService(intent);
+        } catch (Exception ignored) { }
     }
 
     private static int indexOf(Song[] songs, Song song) {
-        if (song == null) {
-            return 0;
-        }
+        if (song == null) return 0;
         for (int i = 0; i < songs.length; i++) {
-            if (songs[i] != null
-                    && songs[i].uri.equals(song.uri)) {
-                return i;
-            }
+            if (songs[i] != null && songs[i].uri.equals(song.uri)) return i;
         }
         return 0;
     }
