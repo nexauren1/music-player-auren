@@ -6,8 +6,11 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+
+import androidx.core.app.ServiceCompat;
 
 public class PlaybackService extends Service {
     public static final String ACTION_PLAY_PAUSE =
@@ -28,7 +31,7 @@ public class PlaybackService extends Service {
     public void onCreate() {
         super.onCreate();
         createChannel();
-        startForeground(NOTIFICATION_ID, buildNotification());
+        promoteToForeground();
     }
 
     @Override
@@ -50,7 +53,20 @@ public class PlaybackService extends Service {
         }
 
         updateNotification();
-        return START_STICKY;
+        return START_NOT_STICKY;
+    }
+
+    private void promoteToForeground() {
+        Notification notification = buildNotification();
+        if (Build.VERSION.SDK_INT >= 29) {
+            ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        } else {
+            startForeground(NOTIFICATION_ID, notification);
+        }
     }
 
     public void updateNotification() {
@@ -71,7 +87,7 @@ public class PlaybackService extends Service {
         PendingIntent next = action(ACTION_NEXT, 12);
         PendingIntent stop = action(ACTION_STOP, 13);
 
-        Intent open = new Intent(this, AurenHomeActivity.class);
+        Intent open = new Intent(this, AurenHomeV2Activity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent content = PendingIntent.getActivity(
@@ -100,7 +116,6 @@ public class PlaybackService extends Service {
                         "Próxima", next)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel,
                         "Parar", stop);
-
         return builder.build();
     }
 
@@ -113,9 +128,7 @@ public class PlaybackService extends Service {
 
     private int pendingFlags() {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= 23) {
-            flags |= PendingIntent.FLAG_IMMUTABLE;
-        }
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
         return flags;
     }
 
