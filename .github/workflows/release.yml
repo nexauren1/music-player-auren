@@ -39,7 +39,8 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
           if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" \
+              -name sdkmanager -type f | head -n 1)"
           fi
 
           if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
@@ -58,8 +59,23 @@ jobs:
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           echo "Android SDK 35 is ready"
 
-      - name: Build signed release APK
+      - name: Build release APK
         run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(sed -n "s/.*versionName ['\"]\([^'\"]*\)['\"].*/\1/p" \
+            app/build.gradle | head -n 1)
+
+          if [ -z "$VERSION" ]; then
+            echo "Could not read versionName"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "App version: $VERSION"
 
       - name: Find APK
         id: apk
@@ -80,7 +96,7 @@ jobs:
         id: release_tag
         shell: bash
         run: |
-          TAG="v1.1.0-build.${GITHUB_RUN_NUMBER}"
+          TAG="v${{ steps.version.outputs.version }}-build.${GITHUB_RUN_NUMBER}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Release tag: $TAG"
 
