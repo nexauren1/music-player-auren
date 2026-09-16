@@ -44,8 +44,6 @@ jobs:
           if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASS" ] \
             || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASS" ]; then
             echo "Missing release signing secrets."
-            echo "Configure AUREN_KEYSTORE_B64, AUREN_STORE_PASS,"
-            echo "AUREN_KEY_ALIAS and AUREN_KEY_PASS in GitHub Secrets."
             exit 1
           fi
 
@@ -53,10 +51,11 @@ jobs:
 
           printf '%s' "$KEYSTORE_B64" \
             | tr -d '[:space:]' \
-            | base64 --decode \
+            | base64 --decode --ignore-garbage \
             > "$RUNNER_TEMP/auren-signing/auren-release.keystore"
 
           test -s "$RUNNER_TEMP/auren-signing/auren-release.keystore"
+
           echo "AUREN_KEYSTORE_PATH=$RUNNER_TEMP/auren-signing/auren-release.keystore" \
             >> "$GITHUB_ENV"
           echo "AUREN_STORE_PASS=$STORE_PASS" >> "$GITHUB_ENV"
