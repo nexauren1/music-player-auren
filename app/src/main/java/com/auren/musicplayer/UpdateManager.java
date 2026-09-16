@@ -148,9 +148,8 @@ public class UpdateManager {
             while (!finished) {
                 try {
                     Thread.sleep(500);
-                    DownloadManager.Cursor cursor = null;
-                    android.database.Cursor result = manager.query(query);
-                    cursor = null;
+                    android.database.Cursor result =
+                            manager.query(query);
                     if (result == null) continue;
                     try {
                         if (!result.moveToFirst()) continue;
