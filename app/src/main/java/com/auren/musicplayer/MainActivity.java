@@ -85,6 +85,8 @@ public class MainActivity extends ComponentActivity {
         LinearLayout root = column();
         root.setBackgroundColor(getColor(R.color.surface));
 
+        root.addView(buildTopBar());
+
         pageContainer = column();
         root.addView(pageContainer, new LinearLayout.LayoutParams(-1, 0, 1));
 
@@ -93,6 +95,32 @@ public class MainActivity extends ComponentActivity {
         root.addView(buildBottomNavigation());
         setContentView(root);
         showHome();
+    }
+
+    private View buildTopBar() {
+        LinearLayout bar = row();
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(10), dp(6), dp(10), dp(6));
+        bar.setBackgroundColor(getColor(R.color.auren_primary));
+        bar.setElevation(dp(4));
+
+        ImageButton menu = iconButton(android.R.drawable.ic_menu_sort_by_size, "Open menu");
+        menu.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+        DrawableCompat.setTint(menu.getDrawable(), Color.WHITE);
+        menu.setOnClickListener(v -> showAppMenu(menu));
+        bar.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        TextView title = text("Auren Music", 19, android.R.color.white);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        bar.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
+
+        ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Search music");
+        search.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+        DrawableCompat.setTint(search.getDrawable(), Color.WHITE);
+        search.setOnClickListener(v -> showSearchDialog());
+        bar.addView(search, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        return bar;
     }
 
     private void showHome() {
@@ -113,9 +141,6 @@ public class MainActivity extends ComponentActivity {
         brandBox.addView(small);
         brandBox.addView(title, margins(0, 4, 0, 0));
         header.addView(brandBox, new LinearLayout.LayoutParams(0, -2, 1));
-        ImageButton menu = iconButton(android.R.drawable.ic_menu_sort_by_size, "Open menu");
-        menu.setOnClickListener(v -> showAppMenu(menu));
-        header.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
         content.addView(header);
 
         LinearLayout quick = row();
@@ -124,7 +149,7 @@ public class MainActivity extends ComponentActivity {
         quick.addView(actionCard("♥", "Favorites", v -> showLibrary(true)), margins(10, 0, 0, 0));
         content.addView(quick, margins(0, 18, 0, 0));
 
-        addSectionHeader(content, "Recently played", "See all", v -> showLibrary(false));
+        addSectionHeader(content, "Recently played", "See all", v -> showLibrary());
         if (recentTracks.isEmpty()) {
             content.addView(emptyCard("Your recently played songs will appear here."));
         } else {
@@ -163,6 +188,32 @@ public class MainActivity extends ComponentActivity {
         pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
     }
 
+    private void showLibrary() {
+        setActiveTab(libraryTab);
+        pageContainer.removeAllViews();
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
+        LinearLayout content = column();
+        content.setPadding(dp(20), dp(16), dp(20), dp(22));
+
+        TextView eyebrow = text("YOUR LIBRARY", 11, R.color.auren_primary);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView title = text("Biblioteca", 30, R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(eyebrow);
+        content.addView(title, margins(0, 3, 0, 16));
+
+        content.addView(librarySectionCard("Mais tocadas", "As músicas que você mais ouve", "♫", v -> showMostPlayed()));
+        content.addView(librarySectionCard("Recentes", "O que você ouviu recentemente", "◷", v -> showRecent()), margins(0, 10, 0, 0));
+        content.addView(librarySectionCard("Playlists", "Suas coleções de músicas", "▤", v -> showPlaylists()), margins(0, 10, 0, 0));
+        content.addView(librarySectionCard("Sugestões", "Músicas escolhidas da sua biblioteca", "✦", v -> showSuggestions()), margins(0, 10, 0, 0));
+        content.addView(librarySectionCard("Favoritos", "Músicas que você marcou com ♥", "♥", v -> showLibrary(true)), margins(0, 10, 0, 0));
+
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+    }
+
     private void showLibrary(boolean favoritesOnly) {
         setActiveTab(libraryTab);
         pageContainer.removeAllViews();
@@ -171,9 +222,9 @@ public class MainActivity extends ComponentActivity {
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
         LinearLayout header = row();
         LinearLayout titles = column();
-        TextView eyebrow = text(favoritesOnly ? "YOUR FAVORITES" : "YOUR LIBRARY", 11, R.color.auren_primary);
+        TextView eyebrow = text("YOUR FAVORITES", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text(favoritesOnly ? "Favorites" : "All music", 30, R.color.text_primary);
+        TextView title = text("Favoritos", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         titles.addView(eyebrow);
         titles.addView(title, margins(0, 3, 0, 0));
@@ -183,21 +234,86 @@ public class MainActivity extends ComponentActivity {
         header.addView(search, new LinearLayout.LayoutParams(dp(48), dp(48)));
         content.addView(header);
 
-        LinearLayout tools = row();
-        tools.addView(chip("All", !favoritesOnly, v -> showLibrary(false)));
-        tools.addView(chip("Favorites", favoritesOnly, v -> showLibrary(true)), margins(8, 0, 0, 0));
-        content.addView(tools, margins(0, 14, 0, 10));
-
         ScrollView scroll = new ScrollView(this);
         LinearLayout list = column();
         List<Track> source = new ArrayList<>();
-        if (favoritesOnly) {
-            for (Track t : tracks) if (isFavorite(t)) source.add(t);
-        } else source.addAll(tracks);
+        for (Track t : tracks) if (isFavorite(t)) source.add(t);
         if (source.isEmpty()) {
-            list.addView(emptyCard(favoritesOnly ? "No favorites yet. Tap the heart in Now Playing." : "No music found on this device."));
+            list.addView(emptyCard("Ainda não há favoritos. Toque no coração durante a reprodução."));
         } else {
             for (Track t : source) list.addView(trackRow(t, 0));
+        }
+        scroll.addView(list);
+        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        pageContainer.addView(content);
+    }
+
+    private View librarySectionCard(String title, String subtitle, String icon, View.OnClickListener listener) {
+        LinearLayout card = rounded(Color.WHITE, 20);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(12), dp(12));
+        card.setElevation(dp(2));
+
+        TextView iconView = text(icon, 25, R.color.auren_primary);
+        iconView.setGravity(Gravity.CENTER);
+        iconView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(iconView, new LinearLayout.LayoutParams(dp(54), dp(54)));
+
+        LinearLayout info = column();
+        TextView name = text(title, 16, R.color.text_primary);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(name);
+        info.addView(text(subtitle, 12, R.color.text_secondary), margins(0, 3, 0, 0));
+        card.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView arrow = text("›", 28, R.color.text_secondary);
+        arrow.setGravity(Gravity.CENTER);
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(48)));
+        card.setOnClickListener(listener);
+        return card;
+    }
+
+    private void showRecent() {
+        setActiveTab(libraryTab);
+        pageContainer.removeAllViews();
+        LinearLayout content = column();
+        content.setPadding(dp(20), dp(16), dp(20), dp(18));
+        TextView eyebrow = text("YOUR HISTORY", 11, R.color.auren_primary);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView title = text("Recentes", 30, R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(eyebrow);
+        content.addView(title, margins(0, 3, 0, 14));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = column();
+        if (recentTracks.isEmpty()) {
+            list.addView(emptyCard("As músicas reproduzidas aparecerão aqui."));
+        } else {
+            for (Track t : recentTracks) list.addView(trackRow(t, 0));
+        }
+        scroll.addView(list);
+        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        pageContainer.addView(content);
+    }
+
+    private void showSuggestions() {
+        setActiveTab(libraryTab);
+        pageContainer.removeAllViews();
+        LinearLayout content = column();
+        content.setPadding(dp(20), dp(16), dp(20), dp(18));
+        TextView eyebrow = text("FOR YOU", 11, R.color.auren_primary);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView title = text("Sugestões", 30, R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(eyebrow);
+        content.addView(title, margins(0, 3, 0, 14));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = column();
+        List<Track> suggestions = suggestionTracks();
+        if (suggestions.isEmpty()) {
+            list.addView(emptyCard("As sugestões aparecerão quando sua biblioteca for carregada."));
+        } else {
+            for (Track t : suggestions) list.addView(trackRow(t, 0));
         }
         scroll.addView(list);
         content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -243,7 +359,7 @@ public class MainActivity extends ComponentActivity {
         nav.setPadding(dp(8), dp(5), dp(8), dp(8));
         nav.setBackgroundColor(Color.WHITE);
         homeTab = navItem("⌂", "Home", v -> showHome());
-        libraryTab = navItem("♫", "Library", v -> showLibrary(false));
+        libraryTab = navItem("♫", "Library", v -> showLibrary());
         playlistTab = navItem("▤", "Playlists", v -> showPlaylists());
         nav.addView(homeTab, new LinearLayout.LayoutParams(0, dp(58), 1));
         nav.addView(libraryTab, new LinearLayout.LayoutParams(0, dp(58), 1));
@@ -269,22 +385,22 @@ public class MainActivity extends ComponentActivity {
 
     private void showAppMenu(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Home");
-        menu.getMenu().add("Library");
-        menu.getMenu().add("Favorites");
+        menu.getMenu().add("Início");
+        menu.getMenu().add("Biblioteca");
+        menu.getMenu().add("Favoritos");
         menu.getMenu().add("Playlists");
-        menu.getMenu().add("Most played");
-        menu.getMenu().add("Settings");
-        menu.getMenu().add("About Auren");
+        menu.getMenu().add("Mais tocadas");
+        menu.getMenu().add("Configurações");
+        menu.getMenu().add("Sobre Auren");
         menu.setOnMenuItemClickListener(item -> {
             String title = item.getTitle().toString();
-            if (title.equals("Home")) showHome();
-            else if (title.equals("Library")) showLibrary(false);
-            else if (title.equals("Favorites")) showLibrary(true);
+            if (title.equals("Início")) showHome();
+            else if (title.equals("Biblioteca")) showLibrary();
+            else if (title.equals("Favoritos")) showLibrary(true);
             else if (title.equals("Playlists")) showPlaylists();
-            else if (title.equals("Most played")) showMostPlayed();
-            else if (title.equals("Settings")) startActivity(new Intent(this, SettingsActivity.class));
-            else if (title.equals("About Auren")) showAboutDialog();
+            else if (title.equals("Mais tocadas")) showMostPlayed();
+            else if (title.equals("Configurações")) startActivity(new Intent(this, SettingsActivity.class));
+            else if (title.equals("Sobre Auren")) showAboutDialog();
             return true;
         });
         menu.show();
@@ -784,7 +900,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void showMostPlayed() {
-        showLibrary(false);
+        showLibrary();
         Toast.makeText(this, "Most played is ranked on the Home screen.", Toast.LENGTH_SHORT).show();
     }
 
