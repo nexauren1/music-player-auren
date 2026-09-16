@@ -4,12 +4,12 @@ import re
 path = Path("app/src/main/java/com/auren/musicplayer/MainActivity.java")
 text = path.read_text()
 
-# Required imports for the generated UI.
 required_imports = [
     "import android.app.Dialog;",
     "import android.widget.ImageButton;",
     "import android.widget.ImageView;",
     "import android.widget.HorizontalScrollView;",
+    "import android.view.WindowManager;",
 ]
 for imp in required_imports:
     if imp not in text:
@@ -18,8 +18,12 @@ for imp in required_imports:
 
 
 def replace_method(source, method_name, replacement):
-    """Replace one Java method using brace matching, so formatting changes do not break it."""
-    match = re.search(r"(?m)^\s*private\\s+(?:[\\w<>]+)\\s+" + re.escape(method_name) + r"\\s*\\([^)]*\\)\\s*\\{", source)
+    match = re.search(
+        r"(?m)^\s*private\s+(?:[\w<>]+)\s+"
+        + re.escape(method_name)
+        + r"\s*\([^)]*\)\s*\{",
+        source,
+    )
     if not match:
         return source, False
     brace_start = source.find("{", match.start())
@@ -30,19 +34,17 @@ def replace_method(source, method_name, replacement):
         elif source[index] == "}":
             depth -= 1
             if depth == 0:
-                return source[:match.start()] + replacement.rstrip() + "\n" + source[index + 1:], True
+                return (
+                    source[:match.start()]
+                    + replacement.rstrip()
+                    + "\n"
+                    + source[index + 1:],
+                    True,
+                )
     return source, False
 
 
-# Keep the hamburger in the persistent top bar.
-if 'menu.setOnClickListener(v -> showAppMenu(menu));' not in text:
-    text = text.replace(
-        'menu.setOnClickListener(v -> showAppMenu(menu));',
-        'menu.setOnClickListener(v -> showAppMenu(menu));',
-        1,
-    )
-
-# Add a large, artwork-led hero to Home without removing the existing sections.
+# Add the large artwork-led Home hero once.
 hero_call = '        content.addView(buildHomeHero(), margins(0, 8, 0, 0));\n'
 if 'content.addView(buildHomeHero()' not in text:
     marker = '        content.addView(header);\n'
@@ -62,7 +64,7 @@ hero_method = '''    private View buildHomeHero() {
             art.setImageDrawable(miniArt.getDrawable());
         } else {
             art.setImageResource(android.R.drawable.ic_media_play);
-            DrawableCompat.setTint(art.getDrawable(), Color.WHITE);
+            if (art.getDrawable() != null) DrawableCompat.setTint(art.getDrawable(), Color.WHITE);
         }
         media.addView(art, new LinearLayout.LayoutParams(dp(88), dp(88)));
 
@@ -99,7 +101,7 @@ if 'private View buildHomeHero()' not in text:
     if insertion >= 0:
         text = text[:insertion] + hero_method + '\n' + text[insertion:]
 
-# Replace the old popup with a real left-side menu like the reference design.
+# Use a real left-side navigation drawer instead of a small popup.
 drawer_method = '''    private void showAppMenu(View anchor) {
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -134,7 +136,7 @@ drawer_method = '''    private void showAppMenu(View anchor) {
 
         View divider = new View(this);
         divider.setBackgroundColor(0xFFE4E8EF);
-        items.addView(divider, new LinearLayout.LayoutParams(-1, dp(1), 1));
+        items.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
 
         addDrawerItem(items, "⚙", "Configurações", () -> {
             dialog.dismiss();
@@ -145,6 +147,8 @@ drawer_method = '''    private void showAppMenu(View anchor) {
         scroll.addView(items);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         dialog.setContentView(root);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.show();
 
         Window window = dialog.getWindow();
         if (window != null) {
@@ -152,14 +156,10 @@ drawer_method = '''    private void showAppMenu(View anchor) {
             window.setDimAmount(0.28f);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             window.setGravity(Gravity.START | Gravity.TOP);
-            window.setLayout(dp(320), -1);
-        }
-        dialog.setCanceledOnTouchOutside(true);
-        dialog.show();
-        window = dialog.getWindow();
-        if (window != null) {
-            window.setGravity(Gravity.START | Gravity.TOP);
-            window.setLayout(Math.min(dp(330), getResources().getDisplayMetrics().widthPixels - dp(24)), -1);
+            window.setLayout(
+                    Math.min(dp(330), getResources().getDisplayMetrics().widthPixels - dp(24)),
+                    -1
+            );
         }
     }
 
@@ -184,10 +184,9 @@ drawer_method = '''    private void showAppMenu(View anchor) {
     }
 '''
 if 'private void addDrawerItem' not in text:
-    text = text.replace('import android.view.Window;\n', 'import android.view.Window;\nimport android.view.WindowManager;\n', 1)
     updated, changed = replace_method(text, 'showAppMenu', drawer_method)
     if changed:
         text = updated
 
 path.write_text(text)
-print("Auren visual enhancement completed: hero artwork + side menu.")
+print("Auren visual enhancement completed: artwork hero + side navigation drawer.")
