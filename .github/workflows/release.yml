@@ -31,6 +31,35 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Prepare release signing
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.AUREN_KEYSTORE_B64 }}
+          STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
+          KEY_ALIAS: ${{ secrets.AUREN_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.AUREN_KEY_PASS }}
+        run: |
+          set -e
+
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASS" ] \
+            || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASS" ]; then
+            echo "Missing release signing secrets."
+            echo "Configure AUREN_KEYSTORE_B64, AUREN_STORE_PASS,"
+            echo "AUREN_KEY_ALIAS and AUREN_KEY_PASS in GitHub Secrets."
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/auren-signing"
+          echo "$KEYSTORE_B64" | base64 --decode \
+            > "$RUNNER_TEMP/auren-signing/auren-release.keystore"
+
+          test -s "$RUNNER_TEMP/auren-signing/auren-release.keystore"
+          echo "AUREN_KEYSTORE_PATH=$RUNNER_TEMP/auren-signing/auren-release.keystore" \
+            >> "$GITHUB_ENV"
+          echo "AUREN_STORE_PASS=$STORE_PASS" >> "$GITHUB_ENV"
+          echo "AUREN_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "AUREN_KEY_PASS=$KEY_PASS" >> "$GITHUB_ENV"
+
       - name: Prepare Android SDK
         shell: bash
         run: |
@@ -106,8 +135,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release_tag.outputs.tag }}
+          tag_name: ${{ steps.release_tag.outputs.tag }}-signed
           target_commitish: ${{ github.sha }}
-          name: Auren Music Player ${{ steps.release_tag.outputs.tag }}
+          name: Auren Music Player ${{ steps.release_tag.outputs.tag }} signed
           generate_release_notes: true
           files: Auren-Music-Player-${{ steps.release_tag.outputs.tag }}.apk
