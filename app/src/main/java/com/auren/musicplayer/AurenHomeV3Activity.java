@@ -64,6 +64,7 @@ public class AurenHomeV3Activity extends Activity
     private Button miniPlay;
     private boolean dark;
     private PopupWindow drawer;
+    private PopupWindow miniMenu;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -79,6 +80,9 @@ public class AurenHomeV3Activity extends Activity
     @Override
     protected void onDestroy() {
         PlayerManager.setListener(null);
+        if (miniMenu != null && miniMenu.isShowing()) {
+            miniMenu.dismiss();
+        }
         artworkExecutor.shutdownNow();
         super.onDestroy();
     }
@@ -201,12 +205,13 @@ public class AurenHomeV3Activity extends Activity
         mini.addView(info,
                 new LinearLayout.LayoutParams(0, -2, 1));
 
-        TextView expand = text("⌃", 21, muted());
+        TextView expand = text("▼", 16, muted());
         expand.setGravity(Gravity.CENTER);
-        expand.setClickable(false);
-        expand.setFocusable(false);
+        expand.setClickable(true);
+        expand.setFocusable(true);
+        expand.setOnClickListener(v -> showMiniMenu());
         mini.addView(expand,
-                new LinearLayout.LayoutParams(dp(28), dp(54)));
+                new LinearLayout.LayoutParams(dp(38), dp(54)));
 
         miniPlay = icon("▶", GREEN, 24);
         miniPlay.setFocusable(false);
@@ -215,6 +220,30 @@ public class AurenHomeV3Activity extends Activity
                 new LinearLayout.LayoutParams(dp(58), dp(58)));
         miniPlay.setOnClickListener(v -> PlayerManager.toggle());
         return mini;
+    }
+
+    private void showMiniMenu() {
+        if (miniMenu != null && miniMenu.isShowing()) {
+            miniMenu.dismiss();
+            return;
+        }
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18), dp(12), dp(18), dp(12));
+        box.setBackgroundColor(panel());
+
+        miniMenu = new PopupWindow(
+                box, dp(320), dp(64), true);
+        miniMenu.setBackgroundDrawable(
+                new android.graphics.drawable.ColorDrawable(
+                        panel()));
+        miniMenu.setElevation(dp(8));
+        miniMenu.setOutsideTouchable(true);
+        miniMenu.showAsDropDown(
+                miniArtwork,
+                dp(8),
+                -dp(112));
     }
 
     private void requestAudioPermission() {
