@@ -88,15 +88,18 @@ hero_method = '''    private View buildHomeHero() {
         if (heroTitle.trim().isEmpty()) heroTitle = "A música move você";
         TextView title = text(heroTitle, 20, android.R.color.white);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setMaxLines(2);
         info.addView(title, margins(0, 4, 0, 2));
 
         String heroArtist = miniArtist == null ? "Descubra, ouça e aproveite" : miniArtist.getText().toString();
         if (heroArtist.trim().isEmpty()) heroArtist = "Descubra, ouça e aproveite";
-        info.addView(text(heroArtist, 12, android.R.color.white));
+        TextView artist = text(heroArtist, 12, android.R.color.white);
+        artist.setMaxLines(1);
+        info.addView(artist);
 
         TextView action = text("Abrir reprodução  ›", 12, android.R.color.white);
         action.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        info.addView(action, margins(0, 12, 0, 0));
+        info.addView(action, margins(0, 10, 0, 0));
         media.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
 
         card.addView(media);
@@ -111,91 +114,77 @@ if 'private View buildHomeHero()' not in text:
     if insertion >= 0:
         text = text[:insertion] + hero_method + '\n' + text[insertion:]
 
-# Use a real left-side navigation drawer instead of a small popup.
-drawer_method = '''    private void showAppMenu(View anchor) {
-        Dialog dialog = new Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        LinearLayout root = column();
-        root.setBackgroundColor(getColor(R.color.surface));
-
-        LinearLayout header = column();
-        header.setPadding(dp(20), dp(28), dp(20), dp(20));
-        header.setBackgroundColor(getColor(R.color.auren_primary));
-
-        TextView brand = text("AUREN", 25, android.R.color.white);
-        brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        header.addView(brand);
-        TextView subtitle = text("Music Player", 13, android.R.color.white);
-        header.addView(subtitle, margins(0, 2, 0, 0));
-        TextView version = text("Versão " + BuildConfig.VERSION_NAME, 11, android.R.color.white);
-        header.addView(version, margins(0, 12, 0, 0));
-        root.addView(header);
-
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout items = column();
-        items.setPadding(dp(10), dp(12), dp(10), dp(16));
-
-        addDrawerItem(items, "⌂", "Início", () -> { dialog.dismiss(); showHome(); });
-        addDrawerItem(items, "♫", "Biblioteca", () -> { dialog.dismiss(); showLibrary(); });
-        addDrawerItem(items, "♥", "Favoritos", () -> { dialog.dismiss(); showLibrary(true); });
-        addDrawerItem(items, "▤", "Playlists", () -> { dialog.dismiss(); showPlaylists(); });
-        addDrawerItem(items, "🔥", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
-        addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
-        addDrawerItem(items, "✦", "Sugestões", () -> { dialog.dismiss(); showSuggestions(); });
-
-        View divider = new View(this);
-        divider.setBackgroundColor(0xFFE4E8EF);
-        items.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
-
-        addDrawerItem(items, "⚙", "Configurações", () -> {
-            dialog.dismiss();
-            startActivity(new Intent(this, SettingsActivity.class));
-        });
-        addDrawerItem(items, "ⓘ", "Sobre Auren", () -> { dialog.dismiss(); showAboutDialog(); });
-
-        scroll.addView(items);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        dialog.setContentView(root);
-        dialog.setCanceledOnTouchOutside(true);
-        dialog.show();
-
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawableResource(android.R.color.transparent);
-            window.setDimAmount(0.28f);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            window.setGravity(Gravity.START | Gravity.TOP);
-            window.setLayout(
-                    Math.min(dp(330), getResources().getDisplayMetrics().widthPixels - dp(24)),
-                    -1
-            );
+# Put every local music track directly on Home, below the discovery sections.
+all_songs_block = '''        // AUREN_ALL_SONGS_HOME_START
+        addSectionHeader(content, "Todas as músicas", tracks.size() + " músicas", v -> showLibrary());
+        if (tracks.isEmpty()) {
+            content.addView(emptyCard("Nenhuma música encontrada no dispositivo."));
+        } else {
+            for (Track track : tracks) {
+                content.addView(trackRow(track, 0));
+            }
         }
-    }
+        // AUREN_ALL_SONGS_HOME_END
 
-    private void addDrawerItem(LinearLayout parent, String icon, String label, Runnable action) {
-        LinearLayout item = rounded(Color.WHITE, 16);
-        item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(dp(14), dp(8), dp(12), dp(8));
+'''
+if 'AUREN_ALL_SONGS_HOME_START' not in text:
+    marker = '        addSectionHeader(content, "Suggestions for you", "Refresh", v -> showHome());\n'
+    text = text.replace(marker, all_songs_block + marker, 1)
 
-        TextView iconView = text(icon, 22, R.color.text_secondary);
-        iconView.setGravity(Gravity.CENTER);
-        item.addView(iconView, new LinearLayout.LayoutParams(dp(48), dp(50)));
+# Replace the mini player with a layout closer to the reference: full-width,
+# compact artwork, title/artist, prominent blue play button, and progress accent.
+mini_method = '''    private LinearLayout buildMiniPlayer() {
+        LinearLayout mini = column();
+        mini.setBackgroundColor(Color.WHITE);
+        mini.setElevation(dp(8));
+        mini.setPadding(0, 0, 0, 0);
 
-        TextView name = text(label, 15, R.color.text_primary);
-        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        item.addView(name, new LinearLayout.LayoutParams(0, dp(50), 1));
+        View progressAccent = new View(this);
+        progressAccent.setBackgroundColor(getColor(R.color.auren_primary));
+        mini.addView(progressAccent, new LinearLayout.LayoutParams(-1, dp(3)));
 
-        TextView arrow = text("›", 25, R.color.text_secondary);
-        item.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(50)));
-        item.setOnClickListener(v -> action.run());
-        parent.addView(item, margins(0, 3, 0, 3));
+        LinearLayout row = row();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(8), dp(7), dp(8), dp(7));
+
+        miniArt = artwork(54);
+        miniArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        row.addView(miniArt, new LinearLayout.LayoutParams(dp(54), dp(54)));
+
+        LinearLayout info = column();
+        info.setGravity(Gravity.CENTER_VERTICAL);
+        info.setPadding(dp(12), 0, dp(6), 0);
+        miniTitle = text("Nothing playing", 14, R.color.text_primary);
+        miniTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        miniTitle.setMaxLines(1);
+        miniArtist = text("Choose a song to start", 12, R.color.text_secondary);
+        miniArtist.setMaxLines(1);
+        info.addView(miniTitle);
+        info.addView(miniArtist, margins(0, 2, 0, 0));
+        row.addView(info, new LinearLayout.LayoutParams(0, dp(54), 1));
+
+        ImageButton miniMore = iconButton(android.R.drawable.ic_menu_more, "Player options");
+        miniMore.setOnClickListener(v -> openNowPlaying());
+        row.addView(miniMore, new LinearLayout.LayoutParams(dp(42), dp(54)));
+
+        miniPlay = iconButton(android.R.drawable.ic_media_play, "Play or pause");
+        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
+        miniPlay.setPadding(dp(12), dp(12), dp(12), dp(12));
+        miniPlay.setOnClickListener(v -> togglePlayback());
+        row.addView(miniPlay, new LinearLayout.LayoutParams(dp(54), dp(54)));
+
+        mini.addView(row);
+        mini.setOnClickListener(v -> openNowPlaying());
+        miniArt.setOnClickListener(v -> openNowPlaying());
+        miniTitle.setOnClickListener(v -> openNowPlaying());
+        miniArtist.setOnClickListener(v -> openNowPlaying());
+        return mini;
     }
 '''
-if 'private void addDrawerItem' not in text:
-    updated, changed = replace_method(text, 'showAppMenu', drawer_method)
-    if changed:
-        text = updated
+updated, changed = replace_method(text, 'buildMiniPlayer', mini_method)
+if changed:
+    text = updated
 
 # Do not allow the release pipeline to proceed with references that are
 # known not to exist in the current MainActivity API.
@@ -204,4 +193,4 @@ for forbidden in ("showNowPlaying();", "roundDrawable("):
         raise SystemExit(f"Unresolved UI enhancement reference: {forbidden}")
 
 path.write_text(text)
-print("Auren visual enhancement completed: artwork hero + side navigation drawer.")
+print("Auren UI enhancement completed: reference-style mini player + all songs on Home.")
