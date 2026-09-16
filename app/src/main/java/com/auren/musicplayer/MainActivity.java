@@ -36,6 +36,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackParameters;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.util.ArrayList;
@@ -68,6 +69,8 @@ public class MainActivity extends ComponentActivity {
     private TextView playlistTab;
     private Dialog nowPlayingDialog;
     private boolean userDragging;
+    private float playbackSpeed = 1.0f;
+    private float playbackPitch = 1.0f;
 
     private final Runnable progressUpdater = new Runnable() {
         @Override public void run() {
@@ -630,6 +633,12 @@ public class MainActivity extends ComponentActivity {
         info.addView(miniArtist, margins(0, 2, 0, 0));
         row.addView(info, new LinearLayout.LayoutParams(0, dp(52), 1));
 
+        ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
+        functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
+        DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
+        functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
+        row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));
+
         ImageButton next = iconButton(android.R.drawable.ic_media_next, "Next song");
         next.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
         DrawableCompat.setTint(next.getDrawable(), getColor(R.color.text_primary));
@@ -695,6 +704,7 @@ public class MainActivity extends ComponentActivity {
             popup.getMenu().add("Reproduzir novamente");
             popup.getMenu().add(isFavorite(currentTrack) ? "Remover dos favoritos" : "Adicionar aos favoritos");
             popup.getMenu().add("Aleatório");
+            popup.getMenu().add("Efeitos: velocidade e pitch");
             popup.getMenu().add("Fechar reprodução");
             popup.setOnMenuItemClickListener(item -> {
                 String action = item.getTitle().toString();
@@ -709,6 +719,8 @@ public class MainActivity extends ComponentActivity {
                 } else if (action.equals("Aleatório")) {
                     shufflePlay();
                     refreshNowPlaying();
+                } else if (action.startsWith("Efeitos:")) {
+                    showEffectsDialog();
                 } else {
                     closeNowPlaying();
                 }
@@ -800,6 +812,96 @@ public class MainActivity extends ComponentActivity {
 
         scroll.addView(root);
         return scroll;
+    }
+
+    private void showMiniPlayerMenu(View anchor) {
+        PopupMenu popup = new PopupMenu(this, anchor);
+        popup.getMenu().add("Efeitos");
+        popup.getMenu().add("Velocidade: " + formatEffectValue(playbackSpeed));
+        popup.getMenu().add("Pitch: " + formatEffectValue(playbackPitch));
+        popup.getMenu().add("Repor efeitos");
+        popup.setOnMenuItemClickListener(item -> {
+            String action = item.getTitle().toString();
+            if (action.equals("Efeitos")) {
+                showEffectsDialog();
+            } else if (action.startsWith("Velocidade:")) {
+                showSpeedDialog();
+            } else if (action.startsWith("Pitch:")) {
+                showPitchDialog();
+            } else if (action.equals("Repor efeitos")) {
+                playbackSpeed = 1.0f;
+                playbackPitch = 1.0f;
+                applyPlaybackEffects();
+                Toast.makeText(this, "Efeitos repostos.", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        });
+        popup.show();
+    }
+
+    private String formatEffectValue(float value) {
+        return String.format(Locale.US, "%.2fx", value);
+    }
+
+    private void applyPlaybackEffects() {
+        if (player != null) {
+            player.setPlaybackParameters(new PlaybackParameters(playbackSpeed, playbackPitch));
+        }
+    }
+
+    private void showEffectsDialog() {
+        final String[] options = {
+                "Velocidade — " + formatEffectValue(playbackSpeed),
+                "Pitch — " + formatEffectValue(playbackPitch),
+                "Repor velocidade e pitch"
+        };
+        new AlertDialog.Builder(this)
+                .setTitle("Efeitos de reprodução")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) showSpeedDialog();
+                    else if (which == 1) showPitchDialog();
+                    else {
+                        playbackSpeed = 1.0f;
+                        playbackPitch = 1.0f;
+                        applyPlaybackEffects();
+                    }
+                })
+                .setNegativeButton("Fechar", null)
+                .show();
+    }
+
+    private void showSpeedDialog() {
+        final float[] values = {0.50f, 0.75f, 1.00f, 1.25f, 1.50f, 1.75f, 2.00f};
+        final String[] labels = {"0.50x", "0.75x", "1.00x Normal", "1.25x", "1.50x", "1.75x", "2.00x"};
+        int checked = 2;
+        for (int i = 0; i < values.length; i++) if (Math.abs(values[i] - playbackSpeed) < 0.01f) checked = i;
+        new AlertDialog.Builder(this)
+                .setTitle("Velocidade")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    playbackSpeed = values[which];
+                    applyPlaybackEffects();
+                    dialog.dismiss();
+                    Toast.makeText(this, "Velocidade: " + labels[which], Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private void showPitchDialog() {
+        final float[] values = {0.75f, 0.85f, 0.95f, 1.00f, 1.05f, 1.15f, 1.25f};
+        final String[] labels = {"-5 semitons", "-3 semitons", "-1 semitom", "Normal", "+1 semitom", "+3 semitons", "+5 semitons"};
+        int checked = 3;
+        for (int i = 0; i < values.length; i++) if (Math.abs(values[i] - playbackPitch) < 0.01f) checked = i;
+        new AlertDialog.Builder(this)
+                .setTitle("Pitch")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    playbackPitch = values[which];
+                    applyPlaybackEffects();
+                    dialog.dismiss();
+                    Toast.makeText(this, "Pitch: " + labels[which], Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
     }
 
     private void closeNowPlaying() {
@@ -996,6 +1098,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout row = rounded(0xFFFFFFFF, 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
+        row.setTag(track.id);
         row.setTag(track.id);
 
         ImageView art = artwork(48);
