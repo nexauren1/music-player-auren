@@ -136,6 +136,71 @@ jobs:
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           echo "Found APK: $APK"
 
+      - name: Create delta update patch
+        id: delta
+        shell: bash
+        run: |
+          set -e
+          NEW_APK="${{ steps.apk.outputs.path }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          WORK="$RUNNER_TEMP/auren-delta"
+          mkdir -p "$WORK"
+
+          RELEASE_JSON="$WORK/latest.json"
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "User-Agent: Auren-Music-Player" \
+            "https://api.github.com/repos/nexauren1/music-player-auren/releases/latest" \
+            > "$RELEASE_JSON"
+
+          OLD_APK_URL=$(jq -r '
+            .assets[]
+            | select(.name | endswith(".apk"))
+            | .browser_download_url
+          ' "$RELEASE_JSON" | head -n 1)
+
+          OLD_VERSION=$(jq -r '.tag_name' "$RELEASE_JSON" \
+            | sed 's/^v//' \
+            | sed 's/-build\..*$//')
+
+          if [ -z "$OLD_APK_URL" ] || [ -z "$OLD_VERSION" ]; then
+            echo "No previous APK found; delta will not be generated."
+            echo "path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          OLD_APK="$WORK/Auren-Music-Player-$OLD_VERSION.apk"
+          PATCH="$WORK/Auren-Music-Player-$OLD_VERSION-to-$VERSION.patch"
+          VERIFY="$WORK/verified-$VERSION.apk"
+          JBSDIFF="$WORK/jbsdiff-1.0.jar"
+
+          echo "Previous version: $OLD_VERSION"
+          echo "Downloading previous APK..."
+          curl -fL --retry 3 "$OLD_APK_URL" -o "$OLD_APK"
+
+          echo "Downloading delta engine..."
+          curl -fL --retry 3 \
+            "https://repo1.maven.org/maven2/io/sigpipe/jbsdiff/1.0/jbsdiff-1.0.jar" \
+            -o "$JBSDIFF"
+
+          echo "Generating binary delta..."
+          java -jar "$JBSDIFF" diff \
+            "$OLD_APK" "$NEW_APK" "$PATCH"
+
+          echo "Verifying delta..."
+          java -jar "$JBSDIFF" patch \
+            "$OLD_APK" "$VERIFY" "$PATCH"
+          cmp "$NEW_APK" "$VERIFY"
+
+          echo "Delta verified."
+          echo "Full APK: $(stat -c%s "$NEW_APK") bytes"
+          echo "Delta:    $(stat -c%s "$PATCH") bytes"
+
+          cp "$PATCH" \
+            "Auren-Music-Player-$OLD_VERSION-to-$VERSION.patch"
+          echo "path=Auren-Music-Player-$OLD_VERSION-to-$VERSION.patch" \
+            >> "$GITHUB_OUTPUT"
+
       - name: Create automatic release tag
         id: release_tag
         shell: bash
@@ -156,4 +221,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Auren Music Player ${{ steps.release_tag.outputs.tag }} signed
           generate_release_notes: true
-          files: Auren-Music-Player-${{ steps.release_tag.outputs.tag }}.apk
+          files: |
+            Auren-Music-Player-${{ steps.release_tag.outputs.tag }}.apk
+            ${{ steps.delta.outputs.path }}
