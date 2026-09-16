@@ -12,6 +12,9 @@ import android.os.PowerManager;
 public final class PlayerManager {
     public interface Listener {
         void onPlayerChanged();
+
+        default void onPlayerError(String message) {
+        }
     }
 
     private static MediaPlayer player;
@@ -87,7 +90,6 @@ public final class PlayerManager {
 
         appContext = context.getApplicationContext();
         currentSong = song;
-        preparing = true;
         releasePlayerOnly();
         preparing = true;
         startPlaybackService();
@@ -97,14 +99,12 @@ public final class PlayerManager {
             MediaPlayer newPlayer = new MediaPlayer();
             player = newPlayer;
             configureAudio(newPlayer);
-
-            if (Build.VERSION.SDK_INT >= 21) {
-                newPlayer.setWakeMode(
-                        appContext,
-                        PowerManager.PARTIAL_WAKE_LOCK);
-            }
-
+            newPlayer.setWakeMode(
+                    appContext,
+                    PowerManager.PARTIAL_WAKE_LOCK);
+            newPlayer.setVolume(1.0f, 1.0f);
             newPlayer.setDataSource(appContext, song.uri);
+
             newPlayer.setOnPreparedListener(mp -> {
                 if (mp != player) {
                     return;
@@ -113,7 +113,8 @@ public final class PlayerManager {
                 try {
                     mp.start();
                 } catch (Exception e) {
-                    releasePlayerOnly();
+                    failPlayback("Não foi possível iniciar esta música.");
+                    return;
                 }
                 notifyChanged();
             });
@@ -127,16 +128,17 @@ public final class PlayerManager {
                 if (mp == player) {
                     preparing = false;
                     releasePlayerOnly();
+                    notifyError("Não foi possível reproduzir esta música.");
                     notifyChanged();
                 }
                 return true;
             });
 
             newPlayer.prepareAsync();
+        } catch (SecurityException e) {
+            failPlayback("O acesso à música foi bloqueado. Verifique a permissão de áudio.");
         } catch (Exception e) {
-            preparing = false;
-            releasePlayerOnly();
-            notifyChanged();
+            failPlayback("Não foi possível abrir este ficheiro de áudio.");
         }
     }
 
@@ -178,7 +180,7 @@ public final class PlayerManager {
                 player.start();
             }
             notifyChanged();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             if (currentSong != null && appContext != null) {
                 play(appContext, currentSong);
             }
@@ -288,6 +290,19 @@ public final class PlayerManager {
                 old.release();
             } catch (Exception ignored) {
             }
+        }
+    }
+
+    private static void failPlayback(String message) {
+        preparing = false;
+        releasePlayerOnly();
+        notifyError(message);
+        notifyChanged();
+    }
+
+    private static void notifyError(String message) {
+        if (listener != null) {
+            listener.onPlayerError(message);
         }
     }
 
