@@ -23,6 +23,9 @@ jobs:
       - name: Apply Auren UI enhancements
         run: python3 scripts/enhance_ui.py
 
+      - name: Verify and repair playlist helpers
+        run: python3 scripts/fix_playlist_build.py
+
       - name: Automatically bump app version
         id: bump_version
         run: |
