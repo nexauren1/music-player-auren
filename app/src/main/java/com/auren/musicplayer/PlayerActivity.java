@@ -9,13 +9,11 @@ import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 public class PlayerActivity extends Activity implements PlayerManager.Listener {
     private static final int GREEN = Color.rgb(32, 150, 42);
@@ -30,17 +28,14 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
     private Button play;
     private Button shuffle;
     private Button repeat;
-    private SongData song;
-    private SongData[] queue;
     private final Handler handler = new Handler();
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        song = readSong();
-        queue = readQueue();
         buildUi();
         PlayerManager.setListener(this);
+        refreshTrack();
         handler.post(updateTask);
     }
 
@@ -78,11 +73,9 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
 
         cover = new ImageView(this);
         cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        cover.setImageResource(android.R.drawable.ic_media_play);
-        cover.setColorFilter(GREEN);
         body.addView(cover, new LinearLayout.LayoutParams(dp(280), dp(280)));
 
-        title = text(song.title, 22, TEXT);
+        title = text("Nenhuma música", 22, TEXT);
         title.setGravity(Gravity.CENTER);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setMaxLines(2);
@@ -91,24 +84,19 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
         titleParams.topMargin = dp(24);
         body.addView(title, titleParams);
 
-        artist = text(song.artist + " · " + song.album, 14,
-                Color.rgb(105, 108, 116));
+        artist = text("Escolha uma música", 14, Color.rgb(105, 108, 116));
         artist.setGravity(Gravity.CENTER);
         artist.setMaxLines(2);
         body.addView(artist);
 
         seekBar = new SeekBar(this);
-        seekBar.setMax(Math.max(1, song.duration > 0
-                ? (int) song.duration : 1));
         LinearLayout.LayoutParams seekParams =
                 new LinearLayout.LayoutParams(-1, dp(42));
         seekParams.topMargin = dp(22);
         body.addView(seekBar, seekParams);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
-                if (fromUser) {
-                    elapsed.setText(format(value));
-                }
+                if (fromUser) elapsed.setText(format(value));
             }
 
             public void onStartTrackingTouch(SeekBar bar) {
@@ -121,7 +109,7 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
 
         LinearLayout times = new LinearLayout(this);
         elapsed = text("0:00", 12, Color.GRAY);
-        total = text(format(song.duration), 12, Color.GRAY);
+        total = text("0:00", 12, Color.GRAY);
         times.addView(elapsed, new LinearLayout.LayoutParams(0, -2, 1));
         total.setGravity(Gravity.RIGHT);
         times.addView(total, new LinearLayout.LayoutParams(0, -2, 1));
@@ -140,7 +128,8 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
 
         Button previous = button("|◀", 22, TEXT);
         controls.addView(previous, new LinearLayout.LayoutParams(dp(68), dp(68)));
-        previous.setOnClickListener(v -> previousSong());
+        previous.setOnClickListener(v ->
+                PlayerManager.previous(this, PlayerManager.getQueue()));
 
         play = button("▶", 30, Color.WHITE);
         play.setBackgroundColor(GREEN);
@@ -149,7 +138,8 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
 
         Button next = button("▶|", 22, TEXT);
         controls.addView(next, new LinearLayout.LayoutParams(dp(68), dp(68)));
-        next.setOnClickListener(v -> nextSong());
+        next.setOnClickListener(v ->
+                PlayerManager.next(this, PlayerManager.getQueue()));
 
         repeat = button("↻", 22, GREEN);
         controls.addView(repeat, new LinearLayout.LayoutParams(dp(58), dp(58)));
@@ -166,38 +156,33 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
 
         root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
-        loadArtwork();
         updateButtons();
     }
 
-    private void nextSong() {
-        PlayerManager.Song[] items = managerQueue();
-        PlayerManager.next(this, items);
-    }
-
-    private void previousSong() {
-        PlayerManager.previous(this, managerQueue());
-    }
-
-    private PlayerManager.Song[] managerQueue() {
-        PlayerManager.Song[] result = new PlayerManager.Song[queue.length];
-        for (int i = 0; i < queue.length; i++) {
-            result[i] = new PlayerManager.Song(
-                    queue[i].title, queue[i].artist, queue[i].album,
-                    queue[i].duration, queue[i].uri);
-        }
-        return result;
+    private void refreshTrack() {
+        PlayerManager.Song current = PlayerManager.getCurrentSong();
+        if (current == null) return;
+        title.setText(current.title);
+        artist.setText(current.artist + " · " + current.album);
+        loadArtwork(current);
+        updateProgress();
     }
 
     private void showQueue() {
+        PlayerManager.Song[] queue = PlayerManager.getQueue();
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < queue.length; i++) {
-            text.append(i + 1).append(". ")
+            boolean current = queue[i].uri.equals(
+                    PlayerManager.getCurrentSong() == null
+                            ? null : PlayerManager.getCurrentSong().uri);
+            text.append(current ? "▶ " : "   ")
+                    .append(i + 1).append(". ")
                     .append(queue[i].title).append("\n");
         }
         new android.app.AlertDialog.Builder(this)
                 .setTitle("Fila de reprodução")
-                .setMessage(text.length() == 0 ? "A fila está vazia." : text.toString())
+                .setMessage(text.length() == 0
+                        ? "A fila está vazia." : text.toString())
                 .setPositiveButton("Fechar", null)
                 .show();
     }
@@ -214,6 +199,7 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
     }
 
     private void updateButtons() {
+        if (play == null) return;
         play.setText(PlayerManager.isPlaying() ? "Ⅱ" : "▶");
         shuffle.setAlpha(PlayerManager.isShuffle() ? 1f : 0.45f);
         repeat.setAlpha(PlayerManager.isRepeat() ? 1f : 0.45f);
@@ -222,17 +208,14 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
     @Override
     public void onPlayerChanged() {
         runOnUiThread(() -> {
-            PlayerManager.Song current = PlayerManager.getCurrentSong();
-            if (current != null) {
-                title.setText(current.title);
-                artist.setText(current.artist + " · " + current.album);
-            }
+            refreshTrack();
             updateButtons();
-            updateProgress();
         });
     }
 
-    private void loadArtwork() {
+    private void loadArtwork(PlayerManager.Song song) {
+        cover.setImageResource(android.R.drawable.ic_media_play);
+        cover.setColorFilter(GREEN);
         try {
             MediaMetadataRetriever retriever = new MediaMetadataRetriever();
             retriever.setDataSource(this, song.uri);
@@ -247,22 +230,6 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
             }
         } catch (Exception ignored) {
         }
-    }
-
-    private SongData readSong() {
-        String title = getIntent().getStringExtra("title");
-        String artist = getIntent().getStringExtra("artist");
-        String album = getIntent().getStringExtra("album");
-        long duration = getIntent().getLongExtra("duration", 0);
-        android.net.Uri uri = getIntent().getParcelableExtra("uri");
-        return new SongData(title == null ? "Nenhuma música" : title,
-                artist == null ? "Artista desconhecido" : artist,
-                album == null ? "Álbum desconhecido" : album,
-                duration, uri);
-    }
-
-    private SongData[] readQueue() {
-        return new SongData[]{song};
     }
 
     private Button button(String value, int size, int color) {
@@ -297,22 +264,5 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
         handler.removeCallbacks(updateTask);
         PlayerManager.setListener(null);
         super.onDestroy();
-    }
-
-    private static final class SongData {
-        final String title;
-        final String artist;
-        final String album;
-        final long duration;
-        final android.net.Uri uri;
-
-        SongData(String title, String artist, String album,
-                 long duration, android.net.Uri uri) {
-            this.title = title;
-            this.artist = artist;
-            this.album = album;
-            this.duration = duration;
-            this.uri = uri;
-        }
     }
 }
