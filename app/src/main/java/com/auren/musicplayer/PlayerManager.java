@@ -52,6 +52,14 @@ public final class PlayerManager {
         return player != null && player.isPlaying();
     }
 
+    public static boolean isShuffle() {
+        return shuffle;
+    }
+
+    public static boolean isRepeat() {
+        return repeat;
+    }
+
     public static int getPosition() {
         if (player == null) return 0;
         return (int) Math.max(0, player.getCurrentPosition());
@@ -74,10 +82,15 @@ public final class PlayerManager {
         try {
             retriever.setDataSource(appContext, currentSong.uri);
             byte[] data = retriever.getEmbeddedPicture();
-            if (data != null) return BitmapFactory.decodeByteArray(data, 0, data.length);
+            if (data != null) {
+                return BitmapFactory.decodeByteArray(data, 0, data.length);
+            }
         } catch (Exception ignored) {
         } finally {
-            try { retriever.release(); } catch (Exception ignored) { }
+            try {
+                retriever.release();
+            } catch (Exception ignored) {
+            }
         }
         return null;
     }
@@ -166,14 +179,19 @@ public final class PlayerManager {
 
     public static void toggle() {
         if (player == null) {
-            if (currentSong != null && appContext != null) play(appContext, currentSong);
+            if (currentSong != null && appContext != null) {
+                play(appContext, currentSong);
+            }
             return;
         }
-        if (player.isPlaying()) player.pause();
-        else if (player.getPlaybackState() == Player.STATE_IDLE) {
+        if (player.isPlaying()) {
+            player.pause();
+        } else if (player.getPlaybackState() == Player.STATE_IDLE) {
             player.prepare();
             player.play();
-        } else player.play();
+        } else {
+            player.play();
+        }
         notifyChanged();
     }
 
@@ -197,7 +215,9 @@ public final class PlayerManager {
         if (shuffle && source.length > 1) {
             do next = (int) (Math.random() * source.length);
             while (next == index);
-        } else next = (index + 1) % source.length;
+        } else {
+            next = (index + 1) % source.length;
+        }
         play(appContext, source[next]);
     }
 
@@ -250,7 +270,10 @@ public final class PlayerManager {
     private static void failPlayback(String message) {
         preparing = false;
         if (player != null) {
-            try { player.stop(); } catch (Exception ignored) { }
+            try {
+                player.stop();
+            } catch (Exception ignored) {
+            }
         }
         notifyError(message);
         notifyChanged();
@@ -266,8 +289,11 @@ public final class PlayerManager {
         try {
             if (Build.VERSION.SDK_INT >= 26) {
                 appContext.startForegroundService(intent);
-            } else appContext.startService(intent);
-        } catch (Exception ignored) { }
+            } else {
+                appContext.startService(intent);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private static void notifyChanged() {
@@ -278,8 +304,11 @@ public final class PlayerManager {
         try {
             if (Build.VERSION.SDK_INT >= 26) {
                 appContext.startForegroundService(intent);
-            } else appContext.startService(intent);
-        } catch (Exception ignored) { }
+            } else {
+                appContext.startService(intent);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private static int indexOf(Song[] songs, Song song) {
