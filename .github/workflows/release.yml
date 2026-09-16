@@ -41,36 +41,27 @@ jobs:
           KEY_PASS: ${{ secrets.AUREN_KEY_PASS }}
         run: |
           set -e
-
           if [ -z "$KEYSTORE_HEX" ] || [ -z "$STORE_PASS" ] \
             || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASS" ]; then
             echo "Missing release signing secrets."
             exit 1
           fi
-
           mkdir -p "$RUNNER_TEMP/auren-signing"
-
           KEYSTORE_HEX=$(printf '%s' "$KEYSTORE_HEX" \
             | tr -d '[:space:]')
-
           if ! printf '%s' "$KEYSTORE_HEX" \
             | grep -Eq '^[0-9A-Fa-f]+$'; then
             echo "AUREN_KEYSTORE_B64 does not contain valid keystore data."
-            echo "Replace it with the HEX value from AUREN_KEYSTORE_HEX.txt."
             exit 1
           fi
-
           if [ $(( ${#KEYSTORE_HEX} % 2 )) -ne 0 ]; then
             echo "Invalid HEX length for keystore."
             exit 1
           fi
-
           printf '%s' "$KEYSTORE_HEX" \
             | xxd -r -p \
             > "$RUNNER_TEMP/auren-signing/auren-release.keystore"
-
           test -s "$RUNNER_TEMP/auren-signing/auren-release.keystore"
-
           echo "AUREN_KEYSTORE_PATH=$RUNNER_TEMP/auren-signing/auren-release.keystore" \
             >> "$GITHUB_ENV"
           echo "AUREN_STORE_PASS=$STORE_PASS" >> "$GITHUB_ENV"
@@ -82,17 +73,14 @@ jobs:
         run: |
           set -e
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
           if [ ! -x "$SDKMANAGER" ]; then
             SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" \
               -name sdkmanager -type f | head -n 1)"
           fi
-
           if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
             echo "Android sdkmanager not found"
             exit 1
           fi
-
           "$SDKMANAGER" "platform-tools" \
             "platforms;android-36" \
             "build-tools;36.0.0"
@@ -112,12 +100,10 @@ jobs:
         run: |
           VERSION=$(sed -n "s/.*versionName ['\"]\([^'\"]*\)['\"].*/\1/p" \
             app/build.gradle | head -n 1)
-
           if [ -z "$VERSION" ]; then
             echo "Could not read versionName"
             exit 1
           fi
-
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "App version: $VERSION"
 
@@ -127,12 +113,10 @@ jobs:
         run: |
           APK=$(find app/build/outputs/apk/release \
             -type f -name '*.apk' | head -n 1)
-
           if [ -z "$APK" ]; then
             echo "No release APK found"
             exit 1
           fi
-
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           echo "Found APK: $APK"
 
@@ -146,25 +130,31 @@ jobs:
           WORK="$RUNNER_TEMP/auren-delta"
           mkdir -p "$WORK"
 
-          RELEASE_JSON="$WORK/latest.json"
+          RELEASES_JSON="$WORK/releases.json"
           curl -fsSL \
             -H "Accept: application/vnd.github+json" \
             -H "User-Agent: Auren-Music-Player" \
-            "https://api.github.com/repos/nexauren1/music-player-auren/releases/latest" \
-            > "$RELEASE_JSON"
+            "https://api.github.com/repos/nexauren1/music-player-auren/releases?per_page=20" \
+            > "$RELEASES_JSON"
 
-          OLD_APK_URL=$(jq -r '
-            .assets[]
+          OLD_APK_URL=$(jq -r --arg v "$VERSION" '
+            .[]
+            | ((.tag_name // "") | sub("^v"; "") | sub("-build\\..*$"; "")) as $old
+            | select($old != $v)
+            | .assets[]?
             | select(.name | endswith(".apk"))
             | .browser_download_url
-          ' "$RELEASE_JSON" | head -n 1)
+          ' "$RELEASES_JSON" | head -n 1)
 
-          OLD_VERSION=$(jq -r '.tag_name' "$RELEASE_JSON" \
-            | sed 's/^v//' \
-            | sed 's/-build\..*$//')
+          OLD_VERSION=$(jq -r --arg v "$VERSION" '
+            .[]
+            | ((.tag_name // "") | sub("^v"; "") | sub("-build\\..*$"; "")) as $old
+            | select($old != $v)
+            | $old
+          ' "$RELEASES_JSON" | head -n 1)
 
           if [ -z "$OLD_APK_URL" ] || [ -z "$OLD_VERSION" ]; then
-            echo "No previous APK found; delta will not be generated."
+            echo "No previous different-version APK found."
             echo "path=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -175,19 +165,14 @@ jobs:
           JBSDIFF="$WORK/jbsdiff-1.0.jar"
 
           echo "Previous version: $OLD_VERSION"
-          echo "Downloading previous APK..."
           curl -fL --retry 3 "$OLD_APK_URL" -o "$OLD_APK"
-
-          echo "Downloading delta engine..."
           curl -fL --retry 3 \
             "https://repo1.maven.org/maven2/io/sigpipe/jbsdiff/1.0/jbsdiff-1.0.jar" \
             -o "$JBSDIFF"
 
-          echo "Generating binary delta..."
           java -jar "$JBSDIFF" diff \
             "$OLD_APK" "$NEW_APK" "$PATCH"
 
-          echo "Verifying delta..."
           java -jar "$JBSDIFF" patch \
             "$OLD_APK" "$VERIFY" "$PATCH"
           cmp "$NEW_APK" "$VERIFY"
