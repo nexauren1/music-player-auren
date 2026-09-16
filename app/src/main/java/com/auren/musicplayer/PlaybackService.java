@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.IBinder;
 
@@ -77,6 +78,9 @@ public class PlaybackService extends Service {
         PlayerManager.Song song = PlayerManager.getCurrentSong();
         String title = song == null ? "Auren Music Player" : song.title;
         String artist = song == null ? "Nenhuma música" : song.artist;
+        int position = PlayerManager.getPosition();
+        int duration = PlayerManager.getDuration();
+        Bitmap artwork = PlayerManager.getCurrentArtwork();
 
         PendingIntent previous = action(ACTION_PREVIOUS, 10);
         PendingIntent playPause = action(ACTION_PLAY_PAUSE, 11);
@@ -96,23 +100,52 @@ public class PlaybackService extends Service {
         builder.setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(title)
                 .setContentText(artist)
+                .setSubText(formatTime(position) + " / " + formatTime(duration))
                 .setContentIntent(content)
                 .setOngoing(PlayerManager.isPlaying())
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .addAction(android.R.drawable.ic_media_previous,
                         "Anterior", previous)
                 .addAction(
                         PlayerManager.isPlaying()
                                 ? android.R.drawable.ic_media_pause
                                 : android.R.drawable.ic_media_play,
-                        PlayerManager.isPlaying() ? "Pausar" : "Reproduzir",
+                        PlayerManager.isPlaying()
+                                ? "Pausar" : "Reproduzir",
                         playPause)
                 .addAction(android.R.drawable.ic_media_next,
                         "Próxima", next)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel,
                         "Parar", stop);
+
+        if (artwork != null) {
+            builder.setLargeIcon(artwork);
+        }
+
+        if (duration > 0) {
+            builder.setProgress(
+                    duration,
+                    Math.min(position, duration),
+                    !PlayerManager.isPlaying());
+        } else {
+            builder.setProgress(0, 0, false);
+        }
+
         return builder.build();
+    }
+
+    private String formatTime(int millis) {
+        if (millis < 0) millis = 0;
+        int totalSeconds = millis / 1000;
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+        return String.format(
+                java.util.Locale.getDefault(),
+                "%d:%02d",
+                minutes,
+                seconds);
     }
 
     private PendingIntent action(String action, int requestCode) {
@@ -124,7 +157,9 @@ public class PlaybackService extends Service {
 
     private int pendingFlags() {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        if (Build.VERSION.SDK_INT >= 23) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
         return flags;
     }
 
@@ -134,9 +169,11 @@ public class PlaybackService extends Service {
                 CHANNEL_ID,
                 "Reprodução de música",
                 NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription("Controles do Auren Music Player");
+        channel.setDescription(
+                "Controles do Auren Music Player");
         NotificationManager manager =
-                (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                (NotificationManager) getSystemService(
+                        NOTIFICATION_SERVICE);
         if (manager != null) manager.createNotificationChannel(channel);
     }
 
