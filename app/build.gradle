@@ -14,9 +14,26 @@ android {
         versionName '1.0.0'
     }
 
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv('AUREN_KEYSTORE_PATH')
+            def keyAliasValue = System.getenv('AUREN_KEY_ALIAS')
+            def keyPasswordValue = System.getenv('AUREN_KEY_PASS')
+            def storePasswordValue = System.getenv('AUREN_STORE_PASS')
+
+            if (keystorePath && keyAliasValue && keyPasswordValue && storePasswordValue) {
+                storeFile = file(keystorePath)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
