@@ -13,10 +13,6 @@ env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
-env:
-  ANDROID_HOME: /usr/local/lib/android/sdk
-  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -86,11 +82,11 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release.outputs.tag }}
+          tag_name: v3.1.1-build.${{ github.run_number }}
           target_commitish: main
-          name: Auren Music Player ${{ steps.release.outputs.tag }}
+          name: Auren Music Player v3.1.1-build.${{ github.run_number }}
           body: |
-            ## Auren Music Player ${{ steps.release.outputs.tag }}
+            ## Auren Music Player v3.1.1-build.${{ github.run_number }}
 
             Signed release APK generated automatically from `main`.
 
@@ -99,6 +95,6 @@ jobs:
             - APK is signed with the project's protected release key.
             - SHA-256 checksum is included as a release asset.
           files: |
-            Auren-Music-Player-${{ steps.release.outputs.tag }}.apk
-            Auren-Music-Player-${{ steps.release.outputs.tag }}.apk.sha256
+            Auren-Music-Player-v3.1.1-build.${{ github.run_number }}.apk
+            Auren-Music-Player-v3.1.1-build.${{ github.run_number }}.apk.sha256
           fail_on_unmatched_files: true
