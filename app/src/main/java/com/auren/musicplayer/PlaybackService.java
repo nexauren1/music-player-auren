@@ -10,8 +10,6 @@ import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 
-import androidx.core.app.ServiceCompat;
-
 public class PlaybackService extends Service {
     public static final String ACTION_PLAY_PAUSE =
             "com.auren.musicplayer.PLAY_PAUSE";
@@ -51,7 +49,6 @@ public class PlaybackService extends Service {
                 return START_NOT_STICKY;
             }
         }
-
         updateNotification();
         return START_NOT_STICKY;
     }
@@ -59,8 +56,7 @@ public class PlaybackService extends Service {
     private void promoteToForeground() {
         Notification notification = buildNotification();
         if (Build.VERSION.SDK_INT >= 29) {
-            ServiceCompat.startForeground(
-                    this,
+            startForeground(
                     NOTIFICATION_ID,
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
