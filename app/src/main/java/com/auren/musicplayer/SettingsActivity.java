@@ -1,11 +1,11 @@
 package com.auren.musicplayer;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Switch;
@@ -64,11 +64,23 @@ public class SettingsActivity extends Activity {
         darkSwitch.setTextColor(textColor);
         darkSwitch.setChecked(dark);
         darkSwitch.setPadding(0, dp(12), 0, dp(12));
-        content.addView(darkSwitch, new LinearLayout.LayoutParams(-1, dp(60)));
+        content.addView(darkSwitch,
+                new LinearLayout.LayoutParams(-1, dp(60)));
         darkSwitch.setOnCheckedChangeListener((button, checked) -> {
             prefs.edit().putBoolean("dark", checked).apply();
             recreate();
         });
+
+        addSection(content, "ATUALIZAÇÕES", textColor);
+        addInfo(content, "Auren Music Player",
+                "Versão instalada: " + BuildConfig.VERSION_NAME,
+                textColor, muted);
+        Button checkUpdates = button(
+                "Verificar atualizações", 16, GREEN);
+        checkUpdates.setGravity(Gravity.CENTER);
+        content.addView(checkUpdates,
+                new LinearLayout.LayoutParams(-1, dp(52)));
+        checkUpdates.setOnClickListener(v -> checkForUpdates());
 
         addSection(content, "REPRODUÇÃO", textColor);
         addInfo(content, "Reprodução em segundo plano",
@@ -93,11 +105,69 @@ public class SettingsActivity extends Activity {
 
         addSection(content, "SOBRE", textColor);
         addInfo(content, "Auren Music Player",
-                "Versão 1.5.0 · Player local para Android",
+                "Versão " + BuildConfig.VERSION_NAME
+                        + " · Player local para Android",
                 textColor, muted);
 
         root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
+    }
+
+    private void checkForUpdates() {
+        new AlertDialog.Builder(this)
+                .setTitle("Verificando atualizações")
+                .setMessage("A procurar uma nova versão...")
+                .setCancelable(true)
+                .show();
+
+        final AlertDialog[] dialog = new AlertDialog[1];
+        dialog[0] = null;
+        UpdateManager.check(this, new UpdateManager.Callback() {
+            @Override
+            public void onResult(UpdateManager.UpdateInfo info) {
+                closeLastDialog();
+                if (!UpdateManager.isNewer(
+                        info.version, BuildConfig.VERSION_NAME)) {
+                    new AlertDialog.Builder(SettingsActivity.this)
+                            .setTitle("Aplicativo atualizado")
+                            .setMessage("Você já está usando a versão "
+                                    + BuildConfig.VERSION_NAME + ".")
+                            .setPositiveButton("OK", null)
+                            .show();
+                    return;
+                }
+
+                new AlertDialog.Builder(SettingsActivity.this)
+                        .setTitle("Nova atualização disponível")
+                        .setMessage("Versão " + info.version
+                                + " disponível.\n\n"
+                                + "Baixe e instale a atualização para "
+                                + "continuar usando a versão mais recente.")
+                        .setNegativeButton("Agora não", null)
+                        .setPositiveButton("Baixar atualização",
+                                (d, which) ->
+                                        UpdateManager.downloadAndInstall(
+                                                SettingsActivity.this, info))
+                        .show();
+            }
+
+            @Override
+            public void onError() {
+                closeLastDialog();
+                new AlertDialog.Builder(SettingsActivity.this)
+                        .setTitle("Não foi possível verificar")
+                        .setMessage("Verifique a sua ligação à internet "
+                                + "e tente novamente.")
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+        });
+    }
+
+    private void closeLastDialog() {
+        if (isFinishing()) return;
+        android.app.Dialog dialog =
+                ((android.app.AlertDialog) null);
     }
 
     private void addSection(LinearLayout parent, String value, int textColor) {
