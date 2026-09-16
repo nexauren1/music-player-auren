@@ -129,12 +129,10 @@ public final class PlayerManager {
         try {
             List<MediaItem> items = buildMediaItems(queue);
             int selectedIndex = indexOf(queue, song);
-
             if (items.isEmpty()) {
                 items.add(toMediaItem(song));
                 selectedIndex = 0;
             }
-
             player.setMediaItems(items, selectedIndex, 0);
             player.prepare();
             player.play();
@@ -192,12 +190,14 @@ public final class PlayerManager {
                     setupEffects();
                 }
                 notifyUiChanged();
+                notifyPlaybackService();
             }
 
             @Override
             public void onMediaItemTransition(MediaItem item, int reason) {
                 updateCurrentSongFromIndex();
                 notifyUiChanged();
+                notifyPlaybackService();
             }
 
             @Override
@@ -206,6 +206,7 @@ public final class PlayerManager {
                 notifyError("Não foi possível reproduzir esta música. "
                         + "Erro " + error.errorCode + ".");
                 notifyUiChanged();
+                notifyPlaybackService();
             }
         });
     }
@@ -234,6 +235,7 @@ public final class PlayerManager {
             player.play();
         }
         notifyUiChanged();
+        notifyPlaybackService();
     }
 
     public static void seekTo(int position) {
@@ -291,6 +293,7 @@ public final class PlayerManager {
         shuffle = value;
         if (player != null) player.setShuffleModeEnabled(value);
         notifyUiChanged();
+        notifyPlaybackService();
     }
 
     public static void setRepeat(boolean value) {
@@ -301,6 +304,7 @@ public final class PlayerManager {
                     : Player.REPEAT_MODE_OFF);
         }
         notifyUiChanged();
+        notifyPlaybackService();
     }
 
     public static boolean isEqualizerEnabled() {
@@ -352,8 +356,10 @@ public final class PlayerManager {
             short max = equalizer.getBandLevelRange()[1];
             short count = equalizer.getNumberOfBands();
             for (short i = 0; i < count; i++) {
-                short value = values[Math.min(i, (short) (values.length - 1))];
-                value = (short) Math.max(min, Math.min(max, value));
+                short value = values[
+                        Math.min(i, (short) (values.length - 1))];
+                value = (short) Math.max(
+                        min, Math.min(max, value));
                 equalizer.setBandLevel(i, value);
             }
             equalizer.setEnabled(true);
@@ -410,6 +416,7 @@ public final class PlayerManager {
         }
         notifyError(message);
         notifyUiChanged();
+        notifyPlaybackService();
     }
 
     private static void notifyError(String message) {
@@ -419,6 +426,20 @@ public final class PlayerManager {
     private static void startPlaybackService() {
         if (appContext == null) return;
         Intent intent = new Intent(appContext, PlaybackService.class);
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                appContext.startForegroundService(intent);
+            } else {
+                appContext.startService(intent);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void notifyPlaybackService() {
+        if (appContext == null) return;
+        Intent intent = new Intent(appContext, PlaybackService.class);
+        intent.setAction(PlaybackService.ACTION_UPDATE);
         try {
             if (Build.VERSION.SDK_INT >= 26) {
                 appContext.startForegroundService(intent);
