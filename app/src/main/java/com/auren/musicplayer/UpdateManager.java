@@ -14,8 +14,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -51,8 +49,10 @@ public class UpdateManager {
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(15000);
-                connection.setRequestProperty("Accept", "application/vnd.github+json");
-                connection.setRequestProperty("User-Agent", "Auren-Music-Player");
+                connection.setRequestProperty(
+                        "Accept", "application/vnd.github+json");
+                connection.setRequestProperty(
+                        "User-Agent", "Auren-Music-Player");
 
                 if (connection.getResponseCode() != 200) {
                     throw new Exception("GitHub response "
@@ -75,9 +75,7 @@ public class UpdateManager {
             } catch (Exception e) {
                 ((Activity) context).runOnUiThread(callback::onError);
             } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
+                if (connection != null) connection.disconnect();
             }
         }).start();
     }
@@ -108,10 +106,19 @@ public class UpdateManager {
         DownloadManager manager = (DownloadManager)
                 activity.getSystemService(Context.DOWNLOAD_SERVICE);
         if (manager == null) {
-            Toast.makeText(
+            showError(activity, "Não foi possível iniciar o download.");
+            return;
+        }
+
+        File destination = new File(
+                activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+                "Auren-Music-Player-" + info.version + ".apk");
+
+        if (destination.exists() && destination.length() > 0) {
+            install(activity, FileProvider.getUriForFile(
                     activity,
-                    "Não foi possível iniciar o download.",
-                    Toast.LENGTH_LONG).show();
+                    activity.getPackageName() + ".fileprovider",
+                    destination));
             return;
         }
 
@@ -119,13 +126,10 @@ public class UpdateManager {
         DownloadManager.Request request =
                 new DownloadManager.Request(uri);
         request.setTitle("Auren Music Player " + info.version);
-        request.setDescription("Baixando atualização...");
+        request.setDescription("A baixar atualização...");
         request.setNotificationVisibility(
                 DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        request.setDestinationInExternalFilesDir(
-                activity,
-                Environment.DIRECTORY_DOWNLOADS,
-                "Auren-Music-Player-" + info.version + ".apk");
+        request.setDestinationUri(Uri.fromFile(destination));
 
         long id = manager.enqueue(request);
         waitForDownload(activity, manager, id, info.version);
@@ -144,35 +148,46 @@ public class UpdateManager {
             while (!finished) {
                 try {
                     Thread.sleep(500);
-                    android.database.Cursor cursor =
-                            manager.query(query);
-                    if (cursor == null) continue;
+                    DownloadManager.Cursor cursor = null;
+                    android.database.Cursor result = manager.query(query);
+                    cursor = null;
+                    if (result == null) continue;
                     try {
-                        if (!cursor.moveToFirst()) continue;
-                        int status = cursor.getInt(
-                                cursor.getColumnIndexOrThrow(
+                        if (!result.moveToFirst()) continue;
+                        int status = result.getInt(
+                                result.getColumnIndexOrThrow(
                                         DownloadManager.COLUMN_STATUS));
                         if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                            String path = cursor.getString(
-                                    cursor.getColumnIndexOrThrow(
-                                            DownloadManager.COLUMN_LOCAL_URI));
                             finished = true;
+                            File file = new File(
+                                    activity.getExternalFilesDir(
+                                            Environment.DIRECTORY_DOWNLOADS),
+                                    "Auren-Music-Player-" + version + ".apk");
                             activity.runOnUiThread(() -> {
                                 Toast.makeText(
                                         activity,
-                                        "Atualização baixada. A instalar...",
+                                        "Download concluído. A atualizar...",
                                         Toast.LENGTH_SHORT).show();
-                                install(activity, Uri.parse(path));
+                                if (file.exists() && file.length() > 0) {
+                                    Uri uri = FileProvider.getUriForFile(
+                                            activity,
+                                            activity.getPackageName()
+                                                    + ".fileprovider",
+                                            file);
+                                    install(activity, uri);
+                                } else {
+                                    showError(activity,
+                                            "APK da atualização não encontrado.");
+                                }
                             });
                         } else if (status == DownloadManager.STATUS_FAILED) {
                             finished = true;
-                            activity.runOnUiThread(() -> Toast.makeText(
+                            activity.runOnUiThread(() -> showError(
                                     activity,
-                                    "Não foi possível baixar a atualização.",
-                                    Toast.LENGTH_LONG).show());
+                                    "Não foi possível baixar a atualização."));
                         }
                     } finally {
-                        cursor.close();
+                        result.close();
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -183,30 +198,22 @@ public class UpdateManager {
         }).start();
     }
 
-    private static void install(Activity activity, Uri localUri) {
+    private static void install(Activity activity, Uri contentUri) {
         try {
-            Uri contentUri = localUri;
-            if ("file".equalsIgnoreCase(localUri.getScheme())) {
-                File file = new File(localUri.getPath());
-                contentUri = FileProvider.getUriForFile(
-                        activity,
-                        activity.getPackageName() + ".fileprovider",
-                        file);
-            }
-
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(
-                    contentUri,
-                    "application/vnd.android.package-archive");
+            Intent intent = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+            intent.setData(contentUri);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             activity.startActivity(intent);
         } catch (Exception e) {
-            Toast.makeText(
-                    activity,
-                    "Não foi possível iniciar a instalação.",
-                    Toast.LENGTH_LONG).show();
+            showError(activity,
+                    "O Android bloqueou a instalação automática. "
+                            + "Permita instalações desta fonte e tente novamente.");
         }
+    }
+
+    private static void showError(Activity activity, String message) {
+        Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
     }
 
     private static String findApk(JSONArray assets) {
