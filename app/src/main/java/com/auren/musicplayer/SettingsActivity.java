@@ -21,6 +21,7 @@ public class SettingsActivity extends Activity {
     private static final int MUTED_DARK = Color.rgb(180, 184, 191);
 
     private SharedPreferences prefs;
+    private AlertDialog checkingDialog;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -114,18 +115,17 @@ public class SettingsActivity extends Activity {
     }
 
     private void checkForUpdates() {
-        new AlertDialog.Builder(this)
+        checkingDialog = new AlertDialog.Builder(this)
                 .setTitle("Verificando atualizações")
                 .setMessage("A procurar uma nova versão...")
                 .setCancelable(true)
-                .show();
+                .create();
+        checkingDialog.show();
 
-        final AlertDialog[] dialog = new AlertDialog[1];
-        dialog[0] = null;
         UpdateManager.check(this, new UpdateManager.Callback() {
             @Override
             public void onResult(UpdateManager.UpdateInfo info) {
-                closeLastDialog();
+                closeCheckingDialog();
                 if (!UpdateManager.isNewer(
                         info.version, BuildConfig.VERSION_NAME)) {
                     new AlertDialog.Builder(SettingsActivity.this)
@@ -153,7 +153,7 @@ public class SettingsActivity extends Activity {
 
             @Override
             public void onError() {
-                closeLastDialog();
+                closeCheckingDialog();
                 new AlertDialog.Builder(SettingsActivity.this)
                         .setTitle("Não foi possível verificar")
                         .setMessage("Verifique a sua ligação à internet "
@@ -164,10 +164,17 @@ public class SettingsActivity extends Activity {
         });
     }
 
-    private void closeLastDialog() {
-        if (isFinishing()) return;
-        android.app.Dialog dialog =
-                ((android.app.AlertDialog) null);
+    private void closeCheckingDialog() {
+        if (checkingDialog != null && checkingDialog.isShowing()) {
+            checkingDialog.dismiss();
+        }
+        checkingDialog = null;
+    }
+
+    @Override
+    protected void onDestroy() {
+        closeCheckingDialog();
+        super.onDestroy();
     }
 
     private void addSection(LinearLayout parent, String value, int textColor) {
