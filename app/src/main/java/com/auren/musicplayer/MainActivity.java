@@ -1,26 +1,33 @@
 package com.auren.musicplayer;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
 import android.content.ContentUris;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.activity.ComponentActivity;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.media3.common.MediaItem;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,7 +35,11 @@ public class MainActivity extends ComponentActivity {
     private static final int MUSIC_PERMISSION = 41;
     private final List<Track> tracks = new ArrayList<>();
     private ExoPlayer player;
-    private TextView nowPlaying;
+    private TextView nowTitle;
+    private TextView nowArtist;
+    private ImageView nowArt;
+    private ImageButton miniPlay;
+    private ObjectAnimator artAnimator;
     private TrackAdapter adapter;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -39,50 +50,76 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void buildUi() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(18), dp(20), 0);
+        LinearLayout root = column();
+        root.setPadding(dp(20), dp(16), dp(20), 0);
         root.setBackgroundColor(getColor(R.color.surface));
 
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView brand = text("AUREN", 24, R.color.text_primary);
-        brand.setTypeface(null, 1);
-        header.addView(brand, new LinearLayout.LayoutParams(0, dp(50), 1));
-        ImageButton settings = new ImageButton(this);
-        settings.setImageResource(android.R.drawable.ic_menu_preferences);
-        settings.setBackgroundColor(0x00000000);
-        settings.setContentDescription("Settings");
+        LinearLayout header = row();
+        TextView brand = text("AUREN", 25, R.color.text_primary);
+        brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView beta = text(" MUSIC", 11, R.color.auren_primary);
+        beta.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        LinearLayout logo = row();
+        logo.addView(brand);
+        logo.addView(beta, margins(2, 7, 0, 0));
+        header.addView(logo, new LinearLayout.LayoutParams(0, dp(52), 1));
+
+        ImageButton settings = iconButton(android.R.drawable.ic_menu_preferences, "Settings");
         settings.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
-        header.addView(settings, new LinearLayout.LayoutParams(dp(50), dp(50)));
+        header.addView(settings, new LinearLayout.LayoutParams(dp(46), dp(46)));
         root.addView(header);
 
-        TextView title = text("Your music", 30, R.color.text_primary);
-        title.setTypeface(null, 1);
+        TextView eyebrow = text("YOUR LIBRARY", 11, R.color.auren_primary);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        root.addView(eyebrow, margins(2, 18, 0, 5));
+
+        TextView title = text("Your music", 31, R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         root.addView(title);
         TextView subtitle = text("Everything you love, in one place.", 14, R.color.text_secondary);
-        root.addView(subtitle, marginParams(0, 2, 0, 14));
+        root.addView(subtitle, margins(0, 2, 0, 16));
+
+        LinearLayout pill = rounded(0xFFEEECFF, 18);
+        TextView count = text("♪  " + tracks.size() + " songs", 13, R.color.auren_primary);
+        count.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        pill.addView(count, margins(14, 7, 14, 7));
+        root.addView(pill, wrapParams());
 
         RecyclerView list = new RecyclerView(this);
         list.setLayoutManager(new LinearLayoutManager(this));
+        list.setClipToPadding(false);
+        list.setPadding(0, dp(8), 0, dp(150));
         adapter = new TrackAdapter();
         list.setAdapter(adapter);
         root.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        LinearLayout mini = new LinearLayout(this);
-        mini.setGravity(Gravity.CENTER_VERTICAL);
-        mini.setPadding(dp(14), dp(8), dp(8), dp(8));
-        mini.setBackgroundColor(getColor(R.color.card));
-        nowPlaying = text("Choose a song to start", 14, R.color.text_primary);
-        nowPlaying.setTypeface(null, 1);
-        mini.addView(nowPlaying, new LinearLayout.LayoutParams(0, dp(58), 1));
-        ImageButton play = new ImageButton(this);
-        play.setImageResource(android.R.drawable.ic_media_play);
-        play.setBackgroundColor(0x00000000);
-        play.setOnClickListener(v -> { if (player.isPlaying()) player.pause(); else player.play(); });
-        mini.addView(play, new LinearLayout.LayoutParams(dp(52), dp(58)));
-        root.addView(mini, marginParams(0, 10, 0, 12));
+        root.addView(buildMiniPlayer(), margins(0, 6, 0, 12));
         setContentView(root);
+    }
+
+    private LinearLayout buildMiniPlayer() {
+        LinearLayout mini = rounded(0xFFFFFFFF, 20);
+        mini.setGravity(Gravity.CENTER_VERTICAL);
+        mini.setPadding(dp(8), dp(8), dp(8), dp(8));
+        mini.setElevation(dp(6));
+
+        nowArt = artwork(52);
+        mini.addView(nowArt, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        LinearLayout info = column();
+        info.setGravity(Gravity.CENTER_VERTICAL);
+        nowTitle = text("Nothing playing", 14, R.color.text_primary);
+        nowTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        nowArtist = text("Choose a song to start", 12, R.color.text_secondary);
+        info.addView(nowTitle);
+        info.addView(nowArtist, margins(0, 2, 0, 0));
+        mini.addView(info, new LinearLayout.LayoutParams(0, dp(58), 1));
+
+        miniPlay = iconButton(android.R.drawable.ic_media_play, "Play");
+        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
+        miniPlay.setOnClickListener(v -> togglePlayback());
+        mini.addView(miniPlay, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        return mini;
     }
 
     private void requestMusicPermission() {
@@ -99,13 +136,13 @@ public class MainActivity extends ComponentActivity {
 
     private void loadMusic() {
         tracks.clear();
-        String[] projection = {MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST};
+        String[] projection = {MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST, MediaStore.Audio.Media.ALBUM_ID};
         String selection = MediaStore.Audio.Media.IS_MUSIC + " != 0";
-        try (Cursor c = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, selection, null,
-                MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
+        try (Cursor c = getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection, selection, null, MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
             if (c != null) while (c.moveToNext()) {
-                long id = c.getLong(0);
-                tracks.add(new Track(id, c.getString(1), c.getString(2)));
+                tracks.add(new Track(c.getLong(0), c.getString(1), c.getString(2), c.getLong(3)));
             }
         }
         adapter.notifyDataSetChanged();
@@ -116,29 +153,165 @@ public class MainActivity extends ComponentActivity {
         player.setMediaItem(MediaItem.fromUri(uri));
         player.prepare();
         player.play();
-        nowPlaying.setText(t.title);
+        nowTitle.setText(t.title);
+        nowArtist.setText(t.artist == null || t.artist.isEmpty() ? "Unknown artist" : t.artist);
+        nowArt.setImageURI(t.albumArtUri());
+        if (nowArt.getDrawable() == null) nowArt.setImageResource(android.R.drawable.ic_media_play);
+        startArtAnimation();
+        miniPlay.setImageResource(android.R.drawable.ic_media_pause);
+    }
+
+    private void togglePlayback() {
+        if (player == null) return;
+        if (player.isPlaying()) {
+            player.pause();
+            miniPlay.setImageResource(android.R.drawable.ic_media_play);
+            stopArtAnimation();
+        } else if (player.getMediaItemCount() > 0) {
+            player.play();
+            miniPlay.setImageResource(android.R.drawable.ic_media_pause);
+            startArtAnimation();
+        }
+    }
+
+    private void startArtAnimation() {
+        if (artAnimator != null) artAnimator.cancel();
+        artAnimator = ObjectAnimator.ofFloat(nowArt, View.ROTATION, 0f, 360f);
+        artAnimator.setDuration(12000);
+        artAnimator.setRepeatCount(ObjectAnimator.INFINITE);
+        artAnimator.setInterpolator(new LinearInterpolator());
+        artAnimator.start();
+    }
+
+    private void stopArtAnimation() {
+        if (artAnimator != null) artAnimator.pause();
+    }
+
+    private LinearLayout column() {
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        return v;
+    }
+
+    private LinearLayout row() {
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.HORIZONTAL);
+        v.setGravity(Gravity.CENTER_VERTICAL);
+        return v;
+    }
+
+    private LinearLayout rounded(int color, int radius) {
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.HORIZONTAL);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(color);
+        bg.setCornerRadius(dp(radius));
+        v.setBackground(bg);
+        return v;
+    }
+
+    private ImageView artwork(int size) {
+        ImageView image = new ImageView(this);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(getColor(R.color.accent_soft));
+        bg.setCornerRadius(dp(15));
+        image.setBackground(bg);
+        image.setImageResource(android.R.drawable.ic_media_play);
+        image.setPadding(dp(12), dp(12), dp(12), dp(12));
+        return image;
+    }
+
+    private ImageButton iconButton(int icon, String description) {
+        ImageButton b = new ImageButton(this);
+        b.setImageResource(icon);
+        b.setContentDescription(description);
+        b.setBackgroundColor(Color.TRANSPARENT);
+        b.setPadding(dp(10), dp(10), dp(10), dp(10));
+        DrawableCompat.setTint(b.getDrawable(), getColor(R.color.text_primary));
+        return b;
     }
 
     private TextView text(String value, float size, int color) {
-        TextView v = new TextView(this); v.setText(value); v.setTextSize(size); v.setTextColor(getColor(color)); return v;
+        TextView v = new TextView(this);
+        v.setText(value);
+        v.setTextSize(size);
+        v.setTextColor(getColor(color));
+        return v;
     }
-    private LinearLayout.LayoutParams marginParams(int l, int t, int r, int b) {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2); p.setMargins(dp(l), dp(t), dp(r), dp(b)); return p;
-    }
-    private int dp(int n) { return (int) (n * getResources().getDisplayMetrics().density + 0.5f); }
 
-    @Override protected void onDestroy() { if (player != null) player.release(); super.onDestroy(); }
+    private LinearLayout.LayoutParams margins(int l, int t, int r, int b) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+        p.setMargins(dp(l), dp(t), dp(r), dp(b));
+        return p;
+    }
+
+    private LinearLayout.LayoutParams wrapParams() {
+        return new LinearLayout.LayoutParams(-2, -2);
+    }
+
+    private int dp(int n) {
+        return (int) (n * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    @Override protected void onDestroy() {
+        if (artAnimator != null) artAnimator.cancel();
+        if (player != null) player.release();
+        super.onDestroy();
+    }
 
     private class TrackAdapter extends RecyclerView.Adapter<TrackHolder> {
-        @NonNull @Override public TrackHolder onCreateViewHolder(@NonNull android.view.ViewGroup p, int type) {
-            LinearLayout row = new LinearLayout(MainActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(4), dp(8), dp(4), dp(8));
-            TextView title = text("", 16, R.color.text_primary); row.addView(title, new LinearLayout.LayoutParams(0, dp(54), 1));
-            TextView artist = text("", 13, R.color.text_secondary); row.addView(artist, new LinearLayout.LayoutParams(dp(130), dp(54)));
-            return new TrackHolder(row, title, artist);
+        @NonNull @Override public TrackHolder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
+            LinearLayout card = rounded(Color.WHITE, 18);
+            card.setGravity(Gravity.CENTER_VERTICAL);
+            card.setPadding(dp(8), dp(8), dp(10), dp(8));
+            card.setElevation(dp(1));
+            ImageView art = artwork(56);
+            card.addView(art, new LinearLayout.LayoutParams(dp(56), dp(56)));
+
+            LinearLayout info = column();
+            info.setGravity(Gravity.CENTER_VERTICAL);
+            TextView title = text("", 15, R.color.text_primary);
+            title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            TextView artist = text("", 12, R.color.text_secondary);
+            info.addView(title);
+            info.addView(artist, margins(0, 3, 0, 0));
+            card.addView(info, new LinearLayout.LayoutParams(0, dp(56), 1));
+
+            TextView more = text("⋯", 25, R.color.text_secondary);
+            more.setGravity(Gravity.CENTER);
+            card.addView(more, new LinearLayout.LayoutParams(dp(32), dp(56)));
+            return new TrackHolder(card, title, artist, art);
         }
-        @Override public void onBindViewHolder(@NonNull TrackHolder h, int pos) { Track t = tracks.get(pos); h.title.setText(t.title); h.artist.setText(t.artist == null ? "Unknown artist" : t.artist); h.itemView.setOnClickListener(v -> play(t)); }
+
+        @Override public void onBindViewHolder(@NonNull TrackHolder h, int pos) {
+            Track t = tracks.get(pos);
+            h.title.setText(t.title == null || t.title.isEmpty() ? "Untitled" : t.title);
+            h.artist.setText(t.artist == null || t.artist.isEmpty() ? "Unknown artist" : t.artist);
+            h.art.setImageURI(t.albumArtUri());
+            if (h.art.getDrawable() == null) h.art.setImageResource(android.R.drawable.ic_media_play);
+            h.itemView.setOnClickListener(v -> play(t));
+        }
+
         @Override public int getItemCount() { return tracks.size(); }
     }
-    private static class TrackHolder extends RecyclerView.ViewHolder { TextView title, artist; TrackHolder(View v, TextView t, TextView a) { super(v); title=t; artist=a; } }
-    private static class Track { long id; String title, artist; Track(long i, String t, String a) { id=i; title=t; artist=a; } }
+
+    private static class TrackHolder extends RecyclerView.ViewHolder {
+        TextView title, artist;
+        ImageView art;
+        TrackHolder(View v, TextView t, TextView a, ImageView i) {
+            super(v); title = t; artist = a; art = i;
+        }
+    }
+
+    private static class Track {
+        long id, albumId;
+        String title, artist;
+        Track(long i, String t, String a, long album) {
+            id = i; title = t; artist = a; albumId = album;
+        }
+        Uri albumArtUri() {
+            return ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId);
+        }
+    }
 }
