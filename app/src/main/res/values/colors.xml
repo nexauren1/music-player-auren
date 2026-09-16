@@ -11,4 +11,6 @@
     <color name="accent_soft">#EEECFF</color>
     <color name="accent_mint">#DDF8F1</color>
     <color name="success">#16A37A</color>
+    <color name="playing_background">#E8F0FF</color>
+    <color name="playing_text">#4F46E5</color>
 </resources>
