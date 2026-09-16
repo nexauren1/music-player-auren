@@ -1,86 +1,135 @@
 package com.auren.musicplayer;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
+
 import androidx.activity.ComponentActivity;
 import androidx.core.content.ContextCompat;
 
 public class SettingsActivity extends ComponentActivity {
     private TextView status;
+    private Button checkButton;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         buildUi();
+        checkForUpdates(false);
     }
 
     private void buildUi() {
         LinearLayout root = column();
-        root.setPadding(dp(20), dp(16), dp(20), dp(22));
         root.setBackgroundColor(getColor(R.color.surface));
 
-        TextView back = text("‹  AUREN", 17, R.color.text_primary);
-        back.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        back.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout bar = row();
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(8), dp(6), dp(12), dp(6));
+        bar.setBackgroundColor(getColor(R.color.auren_primary));
+        bar.setElevation(dp(4));
+
+        TextView back = text("‹", 34, android.R.color.white);
+        back.setGravity(Gravity.CENTER);
         back.setOnClickListener(v -> finish());
-        root.addView(back, new LinearLayout.LayoutParams(-1, dp(54)));
+        bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(52)));
 
-        TextView eyebrow = text("PREFERENCES", 11, R.color.auren_primary);
+        TextView barTitle = text("Configurações", 19, android.R.color.white);
+        barTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        bar.addView(barTitle, new LinearLayout.LayoutParams(0, dp(52), 1));
+        root.addView(bar);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = column();
+        content.setPadding(dp(18), dp(18), dp(18), dp(24));
+
+        TextView eyebrow = text("AUREN MUSIC PLAYER", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(eyebrow, margins(2, 14, 0, 5));
+        content.addView(eyebrow);
 
-        TextView title = text("Settings", 31, R.color.text_primary);
+        TextView title = text("Configurações", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(title);
-        TextView sub = text("Keep Auren ready for what comes next.", 14, R.color.text_secondary);
-        root.addView(sub, margins(0, 3, 0, 22));
+        content.addView(title, margins(0, 3, 0, 5));
+        content.addView(text("Mantenha o Auren atualizado e pronto para a próxima versão.",
+                14, R.color.text_secondary), margins(0, 0, 0, 18));
 
-        LinearLayout card = rounded(getColor(R.color.card), 22);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(18), dp(18), dp(18), dp(18));
-        card.setElevation(dp(2));
+        LinearLayout updateCard = rounded(Color.WHITE, 24);
+        updateCard.setPadding(dp(18), dp(18), dp(18), dp(18));
+        updateCard.setElevation(dp(3));
 
+        LinearLayout iconRow = row();
         TextView icon = text("↻", 28, R.color.auren_primary);
         icon.setGravity(Gravity.CENTER);
-        icon.setBackground(roundDrawable(getColor(R.color.accent_soft), 16));
-        card.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        icon.setBackground(roundDrawable(getColor(R.color.accent_soft), 17));
+        iconRow.addView(icon, new LinearLayout.LayoutParams(dp(58), dp(58)));
 
-        TextView head = text("Updates", 19, R.color.text_primary);
-        head.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(head, margins(0, 16, 0, 4));
+        LinearLayout iconInfo = column();
+        TextView updateTitle = text("Atualização do aplicativo", 18, R.color.text_primary);
+        updateTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        iconInfo.addView(updateTitle);
+        iconInfo.addView(text("Versão atual: " + BuildConfig.VERSION_NAME,
+                13, R.color.text_secondary), margins(0, 3, 0, 0));
+        iconRow.addView(iconInfo, margins(14, 0, 0, 0));
+        updateCard.addView(iconRow);
 
-        TextView version = text("Auren Music  •  Version " + BuildConfig.VERSION_NAME,
-                13, R.color.text_secondary);
-        card.addView(version);
+        status = text("Verificando a versão mais recente…", 13, R.color.text_secondary);
+        status.setPadding(dp(12), dp(12), dp(12), dp(12));
+        status.setBackground(roundDrawable(getColor(R.color.accent_soft), 14));
+        updateCard.addView(status, margins(0, 16, 0, 0));
 
-        Button check = new Button(this);
-        check.setText("Check for updates");
-        check.setTextColor(Color.WHITE);
-        check.setTextSize(14);
-        check.setAllCaps(false);
-        check.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        check.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.auren_primary));
-        check.setOnClickListener(v -> UpdateManager.check(this, status));
-        card.addView(check, margins(0, 18, 0, 0));
+        checkButton = new Button(this);
+        checkButton.setText("Verificar atualizações");
+        checkButton.setTextColor(Color.WHITE);
+        checkButton.setTextSize(14);
+        checkButton.setAllCaps(false);
+        checkButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        checkButton.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.auren_primary));
+        checkButton.setOnClickListener(v -> checkForUpdates(true));
+        updateCard.addView(checkButton, margins(0, 12, 0, 0));
 
-        status = text("You're up to date until we find a newer release.",
+        TextView flow = text(
+                "Se existir uma versão nova, o Auren baixa o APK, abre o instalador oficial do Android e deixa o sistema concluir a atualização.",
                 12, R.color.text_secondary);
-        card.addView(status, margins(0, 10, 0, 0));
-        root.addView(card);
+        updateCard.addView(flow, margins(0, 10, 0, 0));
+        content.addView(updateCard);
 
-        LinearLayout about = rounded(getColor(R.color.accent_mint), 20);
-        about.setPadding(dp(16), dp(14), dp(16), dp(14));
-        TextView aboutText = text("Auren Music\nSimple. Personal. Built to evolve.",
+        LinearLayout about = rounded(getColor(R.color.accent_mint), 22);
+        about.setPadding(dp(16), dp(15), dp(16), dp(15));
+        TextView aboutText = text("Auren Music\nSimples. Pessoal. Sempre evoluindo.\nVersão " + BuildConfig.VERSION_NAME,
                 13, R.color.text_primary);
         aboutText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         about.addView(aboutText);
-        root.addView(about, margins(0, 16, 0, 0));
+        content.addView(about, margins(0, 14, 0, 0));
 
+        scroll.addView(content);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
+    }
+
+    private void checkForUpdates(boolean manual) {
+        if (manual) {
+            checkButton.setEnabled(false);
+            checkButton.setText("Verificando…");
+        }
+        UpdateManager.check(this, status, () -> {
+            if (checkButton != null) {
+                checkButton.setEnabled(true);
+                checkButton.setText("Verificar atualizações");
+            }
+        });
+    }
+
+    private LinearLayout row() {
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.HORIZONTAL);
+        return v;
     }
 
     private LinearLayout column() {
