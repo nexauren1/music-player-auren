@@ -13,6 +13,8 @@ env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
+auto_cancel: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -46,28 +48,23 @@ jobs:
           AUREN_KEYSTORE_B64: ${{ secrets.AUREN_KEYSTORE_B64 }}
           AUREN_STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
         run: |
+          set -euo pipefail
           test -n "$AUREN_KEYSTORE_B64"
+          test -n "$AUREN_STORE_PASS"
+
           KEYSTORE="$RUNNER_TEMP/auren-release.keystore"
           CLEAN_B64=$(printf '%s' "$AUREN_KEYSTORE_B64" | tr -d '[:space:]')
+
           printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE"
           test -s "$KEYSTORE"
 
-          if ! keytool -list -keystore "$KEYSTORE" \
-              -storepass "$AUREN_STORE_PASS" >/dev/null 2>&1; then
-            if printf '%s' "$CLEAN_B64" | base64 --decode 2>/dev/null \
-                | base64 --decode > "$KEYSTORE.second" 2>/dev/null; then
-              if keytool -list -keystore "$KEYSTORE.second" \
-                  -storepass "$AUREN_STORE_PASS" >/dev/null 2>&1; then
-                mv "$KEYSTORE.second" "$KEYSTORE"
-              else
-                rm -f "$KEYSTORE.second"
-              fi
-            fi
-          fi
+          # Validate the decoded file before Gradle starts.
+          keytool -list \
+            -keystore "$KEYSTORE" \
+            -storepass "$AUREN_STORE_PASS" \
+            >/dev/null
 
-          keytool -list -keystore "$KEYSTORE" \
-            -storepass "$AUREN_STORE_PASS" >/dev/null
-          echo "Release keystore validated successfully."
+          echo "Release keystore decoded and validated successfully."
 
       - name: Build signed release APK
         env:
@@ -79,6 +76,7 @@ jobs:
 
       - name: Verify APK
         run: |
+          set -euo pipefail
           test -s app/build/outputs/apk/release/app-release.apk
           APK_SIZE=$(stat -c%s app/build/outputs/apk/release/app-release.apk)
           echo "Release APK size: $APK_SIZE bytes"
@@ -86,6 +84,7 @@ jobs:
       - name: Prepare release metadata
         id: release
         run: |
+          set -euo pipefail
           RELEASE_TAG="v3.1.1-build.${GITHUB_RUN_NUMBER}"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/release/app-release.apk "Auren-Music-Player-${RELEASE_TAG}.apk"
