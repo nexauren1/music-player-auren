@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 
+import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
@@ -71,7 +72,7 @@ public final class PlayerManager {
             return currentSong == null ? 0 : (int) currentSong.duration;
         }
         long duration = player.getDuration();
-        if (duration == Player.TIME_UNSET || duration < 0) {
+        if (duration == C.TIME_UNSET || duration < 0) {
             return currentSong == null ? 0 : (int) currentSong.duration;
         }
         return (int) duration;
