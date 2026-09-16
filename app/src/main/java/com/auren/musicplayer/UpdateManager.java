@@ -112,11 +112,10 @@ public class UpdateManager {
 
     public static void downloadAndInstall(
             Activity activity, UpdateInfo info) {
-        if (info.hasDelta()) {
-            downloadDelta(activity, info);
-        } else {
-            downloadApk(activity, info);
-        }
+        // Use the complete signed APK for now. The previous delta path could
+        // produce an APK that Android rejected even when the binary patch
+        // matched the release bytes. Full APK installation is the safe path.
+        downloadApk(activity, info);
     }
 
     private static void downloadDelta(
