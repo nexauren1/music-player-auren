@@ -2,12 +2,12 @@ package com.auren.musicplayer;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
+import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
 
 public final class PlayerManager {
@@ -19,6 +19,7 @@ public final class PlayerManager {
     }
 
     private static MediaPlayer player;
+    private static ParcelFileDescriptor sourceFd;
     private static Song currentSong;
     private static Song[] queue = new Song[0];
     private static Listener listener;
@@ -134,7 +135,8 @@ public final class PlayerManager {
                     preparing = false;
                     releasePlayerOnly();
                     notifyError(
-                            "Não foi possível reproduzir esta música.");
+                            "Não foi possível reproduzir esta música. "
+                                    + "Erro " + what + "/" + extra + ".");
                     notifyChanged();
                 }
                 return true;
@@ -154,34 +156,16 @@ public final class PlayerManager {
     private static void setDataSourceFromUri(
             MediaPlayer mediaPlayer,
             Uri uri) throws Exception {
-        AssetFileDescriptor afd = null;
-        try {
-            afd = appContext.getContentResolver()
-                    .openAssetFileDescriptor(uri, "r");
-            if (afd == null) {
-                throw new IllegalStateException(
-                        "Ficheiro de áudio indisponível");
-            }
+        closeSourceFd();
+        sourceFd = appContext.getContentResolver()
+                .openFileDescriptor(uri, "r");
 
-            long start = afd.getStartOffset();
-            long length = afd.getLength();
-            if (length >= 0) {
-                mediaPlayer.setDataSource(
-                        afd.getFileDescriptor(),
-                        start,
-                        length);
-            } else {
-                mediaPlayer.setDataSource(
-                        afd.getFileDescriptor());
-            }
-        } finally {
-            if (afd != null) {
-                try {
-                    afd.close();
-                } catch (Exception ignored) {
-                }
-            }
+        if (sourceFd == null) {
+            throw new IllegalStateException(
+                    "Ficheiro de áudio indisponível");
         }
+
+        mediaPlayer.setDataSource(sourceFd.getFileDescriptor());
     }
 
     private static void configureAudio(MediaPlayer mediaPlayer) {
@@ -336,6 +320,18 @@ public final class PlayerManager {
                 old.release();
             } catch (Exception ignored) {
             }
+        }
+
+        closeSourceFd();
+    }
+
+    private static void closeSourceFd() {
+        if (sourceFd != null) {
+            try {
+                sourceFd.close();
+            } catch (Exception ignored) {
+            }
+            sourceFd = null;
         }
     }
 
