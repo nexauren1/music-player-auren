@@ -13,8 +13,6 @@ env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
-auto_cancel: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -58,7 +56,6 @@ jobs:
           printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE"
           test -s "$KEYSTORE"
 
-          # Validate the decoded file before Gradle starts.
           keytool -list \
             -keystore "$KEYSTORE" \
             -storepass "$AUREN_STORE_PASS" \
