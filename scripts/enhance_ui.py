@@ -7,6 +7,8 @@ if "import android.app.AlertDialog;" not in text:
     text = text.replace("import android.app.Dialog;\n", "import android.app.AlertDialog;\nimport android.app.Dialog;\n", 1)
 if "import android.widget.PopupMenu;" not in text:
     text = text.replace("import android.widget.ImageButton;\n", "import android.widget.EditText;\nimport android.widget.ImageButton;\nimport android.widget.PopupMenu;\n", 1)
+if "import android.widget.HorizontalScrollView;" not in text:
+    text = text.replace("import android.widget.ImageView;\n", "import android.widget.HorizontalScrollView;\nimport android.widget.ImageView;\n", 1)
 
 old = '''ImageButton settings = iconButton(android.R.drawable.ic_menu_preferences, "Settings");
         settings.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
