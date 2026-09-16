@@ -96,6 +96,7 @@ public class AurenHomeV2Activity extends Activity implements PlayerManager.Liste
             TextView tab = text(name, 12, Color.WHITE);
             tab.setGravity(Gravity.CENTER);
             tab.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            tab.setClickable(true);
             tabs.addView(tab, new LinearLayout.LayoutParams(0, dp(46), 1));
             tab.setOnClickListener(v -> selectTab(name));
         }
@@ -110,7 +111,9 @@ public class AurenHomeV2Activity extends Activity implements PlayerManager.Liste
         list.setBackgroundColor(bg());
         list.setItemsCanFocus(false);
         list.setOnItemClickListener((parent, view, position, id) -> {
-            if (position >= 0 && position < visible.size()) playSong(visible.get(position));
+            if (position >= 0 && position < visible.size()) {
+                playSong(visible.get(position));
+            }
         });
         root.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
         root.addView(buildMiniPlayer());
@@ -124,27 +127,48 @@ public class AurenHomeV2Activity extends Activity implements PlayerManager.Liste
     private LinearLayout buildMiniPlayer() {
         LinearLayout mini = new LinearLayout(this);
         mini.setGravity(Gravity.CENTER_VERTICAL);
-        mini.setPadding(dp(10), dp(5), dp(8), dp(5));
+        mini.setPadding(dp(10), dp(5), dp(6), dp(5));
         mini.setBackgroundColor(panel());
         mini.setClickable(true);
+        mini.setFocusable(false);
+        mini.setElevation(dp(3));
         mini.setOnClickListener(v -> openCurrentPlayer());
 
         ImageView image = new ImageView(this);
         image.setImageResource(android.R.drawable.ic_media_play);
         image.setColorFilter(GREEN);
+        image.setClickable(false);
+        image.setFocusable(false);
         mini.addView(image, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         LinearLayout info = new LinearLayout(this);
         info.setOrientation(LinearLayout.VERTICAL);
         info.setPadding(dp(10), 0, dp(4), 0);
+        info.setClickable(false);
+        info.setFocusable(false);
+
         nowTitle = text("Nenhuma música", 15, mainText());
         nowTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         nowTitle.setMaxLines(1);
+        nowTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        nowTitle.setClickable(false);
+        nowTitle.setFocusable(false);
+
         nowArtist = text("Escolha uma música", 12, muted());
         nowArtist.setMaxLines(1);
+        nowArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        nowArtist.setClickable(false);
+        nowArtist.setFocusable(false);
+
         info.addView(nowTitle);
         info.addView(nowArtist);
         mini.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView expand = text("⌃", muted(), 20);
+        expand.setGravity(Gravity.CENTER);
+        expand.setClickable(false);
+        expand.setFocusable(false);
+        mini.addView(expand, new LinearLayout.LayoutParams(dp(28), dp(54)));
 
         miniPlay = icon("▶", GREEN, 24);
         miniPlay.setFocusable(false);
@@ -255,21 +279,37 @@ public class AurenHomeV2Activity extends Activity implements PlayerManager.Liste
             ImageView image = new ImageView(AurenHomeV2Activity.this);
             image.setImageResource(android.R.drawable.ic_media_play);
             image.setColorFilter(GREEN);
+            image.setClickable(false);
+            image.setFocusable(false);
             row.addView(image, new LinearLayout.LayoutParams(dp(54), dp(54)));
 
             LinearLayout info = new LinearLayout(AurenHomeV2Activity.this);
             info.setOrientation(LinearLayout.VERTICAL);
             info.setPadding(dp(12), 0, dp(4), 0);
+            info.setClickable(false);
+            info.setFocusable(false);
+
             TextView title = text(song.title, 16, mainText());
             title.setMaxLines(2);
+            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            title.setClickable(false);
+            title.setFocusable(false);
+
             TextView meta = text(song.artist + " · " + song.album, 12, muted());
             meta.setMaxLines(1);
+            meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            meta.setClickable(false);
+            meta.setFocusable(false);
+
             info.addView(title);
             info.addView(meta);
             row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
 
-            row.addView(text(format(song.duration), 12, muted()),
-                    new LinearLayout.LayoutParams(dp(45), -2));
+            TextView duration = text(format(song.duration), 12, muted());
+            duration.setGravity(Gravity.CENTER);
+            duration.setClickable(false);
+            duration.setFocusable(false);
+            row.addView(duration, new LinearLayout.LayoutParams(dp(45), -2));
 
             Button actions = icon("⋮", mainText(), 25);
             actions.setFocusable(false);
@@ -282,22 +322,20 @@ public class AurenHomeV2Activity extends Activity implements PlayerManager.Liste
 
     private void playSong(PlayerManager.Song song) {
         if (song == null) return;
+        PlayerManager.setQueue(songs.toArray(new PlayerManager.Song[0]));
         PlayerManager.play(this, song);
+        updateMiniPlayer();
         Toast.makeText(this, "A reproduzir: " + song.title, Toast.LENGTH_SHORT).show();
-        openPlayer(song);
     }
 
     private void openCurrentPlayer() {
         PlayerManager.Song song = PlayerManager.getCurrentSong();
-        if (song == null && !songs.isEmpty()) song = songs.get(0);
         if (song == null) return;
-        if (!PlayerManager.isPlaying() && !PlayerManager.isPreparing()) {
-            PlayerManager.play(this, song);
-        }
         openPlayer(song);
     }
 
     private void openPlayer(PlayerManager.Song song) {
+        if (song == null) return;
         Intent intent = new Intent(this, PlayerActivity.class);
         intent.putExtra("title", song.title);
         intent.putExtra("artist", song.artist);
