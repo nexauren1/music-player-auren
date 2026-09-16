@@ -23,9 +23,9 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -56,7 +56,7 @@ public class AurenHomeV3Activity extends Activity
             Executors.newFixedThreadPool(3);
 
     private SharedPreferences prefs;
-    private GridView grid;
+    private ListView list;
     private TextView count;
     private TextView nowTitle;
     private TextView nowArtist;
@@ -100,21 +100,27 @@ public class AurenHomeV3Activity extends Activity
         bar.setBackgroundColor(GREEN);
 
         Button menu = icon("☰", Color.WHITE, 28);
-        bar.addView(menu, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        bar.addView(menu,
+                new LinearLayout.LayoutParams(dp(54), dp(54)));
 
         TextView brand = text("AUREN", 21, Color.WHITE);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        bar.addView(brand, new LinearLayout.LayoutParams(0, dp(54), 1));
+        bar.addView(brand,
+                new LinearLayout.LayoutParams(0, dp(54), 1));
 
         Button search = icon("⌕", Color.WHITE, 30);
         Button more = icon("⋮", Color.WHITE, 28);
-        bar.addView(search, new LinearLayout.LayoutParams(dp(52), dp(54)));
-        bar.addView(more, new LinearLayout.LayoutParams(dp(46), dp(54)));
+        bar.addView(search,
+                new LinearLayout.LayoutParams(dp(52), dp(54)));
+        bar.addView(more,
+                new LinearLayout.LayoutParams(dp(46), dp(54)));
         root.addView(bar);
 
         LinearLayout tabs = new LinearLayout(this);
         tabs.setBackgroundColor(GREEN);
-        String[] names = {"MÚSICAS", "ÁLBUNS", "ARTISTAS", "FAVORITOS"};
+        String[] names = {
+                "MÚSICAS", "ÁLBUNS", "ARTISTAS", "FAVORITOS"
+        };
         for (String name : names) {
             TextView tab = text(name, 12, Color.WHITE);
             tab.setGravity(Gravity.CENTER);
@@ -127,22 +133,21 @@ public class AurenHomeV3Activity extends Activity
         root.addView(tabs);
 
         count = text("A carregar músicas...", 14, muted());
-        count.setPadding(dp(16), dp(11), dp(16), dp(7));
+        count.setPadding(dp(16), dp(12), dp(16), dp(7));
         root.addView(count);
 
-        grid = new GridView(this);
-        grid.setNumColumns(2);
-        grid.setHorizontalSpacing(dp(8));
-        grid.setVerticalSpacing(dp(10));
-        grid.setPadding(dp(10), dp(4), dp(10), dp(10));
-        grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        grid.setBackgroundColor(bg());
-        grid.setOnItemClickListener((parent, view, position, id) -> {
+        list = new ListView(this);
+        list.setDivider(null);
+        list.setBackgroundColor(bg());
+        list.setItemsCanFocus(false);
+        list.setPadding(0, dp(2), 0, dp(8));
+        list.setOnItemClickListener((parent, view, position, id) -> {
             if (position >= 0 && position < visible.size()) {
                 playSong(visible.get(position));
             }
         });
-        root.addView(grid, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(list,
+                new LinearLayout.LayoutParams(-1, 0, 1));
         root.addView(buildMiniPlayer());
 
         menu.setOnClickListener(v -> showDrawer());
@@ -154,16 +159,17 @@ public class AurenHomeV3Activity extends Activity
     private LinearLayout buildMiniPlayer() {
         LinearLayout mini = new LinearLayout(this);
         mini.setGravity(Gravity.CENTER_VERTICAL);
-        mini.setPadding(dp(8), dp(5), dp(5), dp(5));
+        mini.setPadding(dp(10), dp(5), dp(6), dp(5));
         mini.setBackgroundColor(panel());
         mini.setClickable(true);
         mini.setFocusable(false);
-        mini.setElevation(dp(4));
+        mini.setElevation(dp(3));
         mini.setOnClickListener(v -> openCurrentPlayer());
 
         miniArtwork = new ImageView(this);
         miniArtwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        miniArtwork.setImageResource(android.R.drawable.ic_media_play);
+        miniArtwork.setImageResource(
+                android.R.drawable.ic_media_play);
         miniArtwork.setColorFilter(GREEN);
         miniArtwork.setClickable(false);
         miniArtwork.setFocusable(false);
@@ -218,7 +224,8 @@ public class AurenHomeV3Activity extends Activity
         if (Build.VERSION.SDK_INT >= 23
                 && checkSelfPermission(permission)
                 != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{permission}, REQUEST_AUDIO);
+            requestPermissions(
+                    new String[]{permission}, REQUEST_AUDIO);
         } else {
             loadSongs();
         }
@@ -226,11 +233,12 @@ public class AurenHomeV3Activity extends Activity
 
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= 33
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                && checkSelfPermission(
+                Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{
-                    Manifest.permission.POST_NOTIFICATIONS
-            }, REQUEST_NOTIFICATIONS);
+            requestPermissions(
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    REQUEST_NOTIFICATIONS);
         }
     }
 
@@ -246,7 +254,8 @@ public class AurenHomeV3Activity extends Activity
                     && results[0] == PackageManager.PERMISSION_GRANTED) {
                 loadSongs();
             } else if (count != null) {
-                count.setText("Permissão para acessar músicas é necessária");
+                count.setText(
+                        "Permissão para acessar músicas é necessária");
             }
         }
     }
@@ -309,74 +318,117 @@ public class AurenHomeV3Activity extends Activity
         refresh(songs, songs.size() + " músicas");
     }
 
-    private void refresh(List<PlayerManager.Song> source, String label) {
+    private void refresh(
+            List<PlayerManager.Song> source,
+            String label) {
         visible.clear();
         visible.addAll(source);
-        grid.setAdapter(new CoverAdapter());
+        list.setAdapter(new SongAdapter());
         count.setText(label);
     }
 
-    private class CoverAdapter
+    private class SongAdapter
             extends ArrayAdapter<PlayerManager.Song> {
-        CoverAdapter() {
+        SongAdapter() {
             super(AurenHomeV3Activity.this,
-                    android.R.layout.simple_list_item_1, visible);
+                    android.R.layout.simple_list_item_1,
+                    visible);
         }
 
         @Override
-        public View getView(int position, View old, ViewGroup parent) {
+        public View getView(
+                int position,
+                View old,
+                ViewGroup parent) {
             PlayerManager.Song song = visible.get(position);
 
-            LinearLayout card = new LinearLayout(
+            LinearLayout row = new LinearLayout(
                     AurenHomeV3Activity.this);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(dp(6), dp(6), dp(6), dp(8));
-            card.setGravity(Gravity.CENTER_HORIZONTAL);
-            card.setClickable(true);
-            card.setFocusable(false);
-            card.setBackground(round(panel(), 16));
-            card.setOnClickListener(v -> playSong(song));
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(14), dp(7), dp(6), dp(7));
+            row.setMinimumHeight(dp(70));
+            row.setClickable(true);
+            row.setFocusable(false);
+            row.setBackgroundColor(bg());
+            row.setOnClickListener(v -> playSong(song));
 
-            ImageView cover = new ImageView(
+            ImageView image = new ImageView(
                     AurenHomeV3Activity.this);
-            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            cover.setImageResource(android.R.drawable.ic_media_play);
-            cover.setColorFilter(GREEN);
-            cover.setTag(song.uri.toString());
-            cover.setBackground(round(
-                    dark ? Color.rgb(50, 52, 58) : Color.rgb(238, 240, 244),
-                    13));
-            card.addView(cover,
+            image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            image.setImageResource(
+                    android.R.drawable.ic_media_play);
+            image.setColorFilter(GREEN);
+            image.setTag(song.uri.toString());
+            image.setBackground(round(
+                    dark
+                            ? Color.rgb(50, 52, 58)
+                            : Color.rgb(238, 240, 244),
+                    10));
+            image.setClickable(false);
+            image.setFocusable(false);
+            row.addView(image,
                     new LinearLayout.LayoutParams(
-                            -1, dp(150)));
+                            dp(58), dp(58)));
 
-            TextView title = text(song.title, 15, mainText());
-            title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            title.setMaxLines(2);
-            title.setEllipsize(TextUtils.TruncateAt.END);
-            title.setGravity(Gravity.CENTER_HORIZONTAL);
-            title.setPadding(dp(3), dp(7), dp(3), 0);
+            LinearLayout info = new LinearLayout(
+                    AurenHomeV3Activity.this);
+            info.setOrientation(LinearLayout.VERTICAL);
+            info.setGravity(Gravity.CENTER_VERTICAL);
+            info.setPadding(dp(12), 0, dp(4), 0);
+            info.setClickable(false);
+            info.setFocusable(false);
+
+            TextView title = text(
+                    song.title, 16, mainText());
+            title.setTypeface(
+                    Typeface.DEFAULT, Typeface.BOLD);
+            title.setMaxLines(1);
+            title.setEllipsize(
+                    TextUtils.TruncateAt.END);
             title.setClickable(false);
             title.setFocusable(false);
-            card.addView(title,
-                    new LinearLayout.LayoutParams(-1, -2));
 
-            TextView artist = text(song.artist, 12, muted());
-            artist.setMaxLines(1);
-            artist.setEllipsize(TextUtils.TruncateAt.END);
-            artist.setGravity(Gravity.CENTER_HORIZONTAL);
-            artist.setPadding(dp(3), dp(2), dp(3), 0);
-            artist.setClickable(false);
-            artist.setFocusable(false);
-            card.addView(artist,
-                    new LinearLayout.LayoutParams(-1, -2));
+            String metaText = song.artist;
+            if (!song.album.isEmpty()) {
+                metaText += " · " + song.album;
+            }
+            TextView meta = text(
+                    metaText, 12, muted());
+            meta.setMaxLines(1);
+            meta.setEllipsize(
+                    TextUtils.TruncateAt.END);
+            meta.setClickable(false);
+            meta.setFocusable(false);
 
-            loadArtwork(song, cover);
-            return card;
+            info.addView(title);
+            info.addView(meta);
+            row.addView(info,
+                    new LinearLayout.LayoutParams(0, -2, 1));
+
+            TextView duration = text(
+                    format(song.duration), 12, muted());
+            duration.setGravity(Gravity.CENTER);
+            duration.setClickable(false);
+            duration.setFocusable(false);
+            row.addView(duration,
+                    new LinearLayout.LayoutParams(dp(45), -2));
+
+            Button actions = icon("⋮", mainText(), 25);
+            actions.setFocusable(false);
+            actions.setFocusableInTouchMode(false);
+            actions.setOnClickListener(v -> songMenu(song));
+            row.addView(actions,
+                    new LinearLayout.LayoutParams(
+                            dp(44), dp(54)));
+
+            loadArtwork(song, image);
+            return row;
         }
     }
 
-    private void loadArtwork(PlayerManager.Song song, ImageView view) {
+    private void loadArtwork(
+            PlayerManager.Song song,
+            ImageView view) {
         final String key = song.uri.toString();
         Bitmap cached = artworkCache.get(key);
         if (cached != null) {
@@ -387,7 +439,9 @@ public class AurenHomeV3Activity extends Activity
 
         artworkExecutor.execute(() -> {
             Bitmap bitmap = extractArtwork(song.uri);
-            if (bitmap == null) return;
+            if (bitmap == null) {
+                return;
+            }
             artworkCache.put(key, bitmap);
             runOnUiThread(() -> {
                 if (key.equals(view.getTag())) {
@@ -404,11 +458,16 @@ public class AurenHomeV3Activity extends Activity
         try {
             retriever.setDataSource(this, uri);
             byte[] data = retriever.getEmbeddedPicture();
-            if (data == null || data.length == 0) return null;
+            if (data == null || data.length == 0) {
+                return null;
+            }
             Bitmap bitmap = BitmapFactory.decodeByteArray(
                     data, 0, data.length);
-            if (bitmap == null) return null;
-            return Bitmap.createScaledBitmap(bitmap, 500, 500, true);
+            if (bitmap == null) {
+                return null;
+            }
+            return Bitmap.createScaledBitmap(
+                    bitmap, 300, 300, true);
         } catch (Exception ignored) {
             return null;
         } finally {
@@ -420,7 +479,9 @@ public class AurenHomeV3Activity extends Activity
     }
 
     private void playSong(PlayerManager.Song song) {
-        if (song == null) return;
+        if (song == null) {
+            return;
+        }
         PlayerManager.setQueue(
                 songs.toArray(new PlayerManager.Song[0]));
         PlayerManager.play(this, song);
@@ -428,12 +489,16 @@ public class AurenHomeV3Activity extends Activity
     }
 
     private void openCurrentPlayer() {
-        PlayerManager.Song song = PlayerManager.getCurrentSong();
-        if (song != null) openPlayer(song);
+        PlayerManager.Song song =
+                PlayerManager.getCurrentSong();
+        if (song != null) {
+            openPlayer(song);
+        }
     }
 
     private void openPlayer(PlayerManager.Song song) {
-        Intent intent = new Intent(this, PlayerActivity.class);
+        Intent intent = new Intent(
+                this, PlayerActivity.class);
         intent.putExtra("title", song.title);
         intent.putExtra("artist", song.artist);
         intent.putExtra("album", song.album);
@@ -443,8 +508,12 @@ public class AurenHomeV3Activity extends Activity
     }
 
     private void updateMiniPlayer() {
-        if (nowTitle == null) return;
-        PlayerManager.Song song = PlayerManager.getCurrentSong();
+        if (nowTitle == null) {
+            return;
+        }
+
+        PlayerManager.Song song =
+                PlayerManager.getCurrentSong();
         if (song == null) {
             nowTitle.setText("Nenhuma música");
             nowArtist.setText("Escolha uma música");
@@ -462,7 +531,8 @@ public class AurenHomeV3Activity extends Activity
         loadMiniArtwork(song);
     }
 
-    private void loadMiniArtwork(PlayerManager.Song song) {
+    private void loadMiniArtwork(
+            PlayerManager.Song song) {
         String key = song.uri.toString();
         Bitmap cached = artworkCache.get(key);
         if (cached != null) {
@@ -470,9 +540,12 @@ public class AurenHomeV3Activity extends Activity
             miniArtwork.clearColorFilter();
             return;
         }
+
         artworkExecutor.execute(() -> {
             Bitmap bitmap = extractArtwork(song.uri);
-            if (bitmap == null) return;
+            if (bitmap == null) {
+                return;
+            }
             artworkCache.put(key, bitmap);
             runOnUiThread(() -> {
                 PlayerManager.Song current =
@@ -502,22 +575,28 @@ public class AurenHomeV3Activity extends Activity
         input.setHint("Música, artista ou álbum");
         input.setSingleLine(true);
         new AlertDialog.Builder(this)
-                .setTitle("Pesquisar")
+                .setTitle("Pesquisar música")
                 .setView(input)
                 .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Pesquisar",
-                        (d, w) -> filter(input.getText().toString()))
+                .setPositiveButton(
+                        "Pesquisar",
+                        (d, w) -> filter(
+                                input.getText().toString()))
                 .show();
     }
 
     private void filter(String value) {
         String q = value.toLowerCase(Locale.ROOT).trim();
-        List<PlayerManager.Song> result = new ArrayList<>();
+        List<PlayerManager.Song> result =
+                new ArrayList<>();
         for (PlayerManager.Song song : songs) {
             if (q.isEmpty()
-                    || song.title.toLowerCase(Locale.ROOT).contains(q)
-                    || song.artist.toLowerCase(Locale.ROOT).contains(q)
-                    || song.album.toLowerCase(Locale.ROOT).contains(q)) {
+                    || song.title.toLowerCase(Locale.ROOT)
+                    .contains(q)
+                    || song.artist.toLowerCase(Locale.ROOT)
+                    .contains(q)
+                    || song.album.toLowerCase(Locale.ROOT)
+                    .contains(q)) {
                 result.add(song);
             }
         }
@@ -539,27 +618,36 @@ public class AurenHomeV3Activity extends Activity
     private void showFavorites() {
         Set<String> fav = prefs.getStringSet(
                 "favorites", new HashSet<>());
-        List<PlayerManager.Song> result = new ArrayList<>();
+        List<PlayerManager.Song> result =
+                new ArrayList<>();
         for (PlayerManager.Song song : songs) {
-            if (fav.contains(song.uri.toString())) result.add(song);
+            if (fav.contains(song.uri.toString())) {
+                result.add(song);
+            }
         }
         refresh(result, result.size() + " favoritos");
     }
 
     private void showUniqueArtists() {
-        List<PlayerManager.Song> result = new ArrayList<>();
+        List<PlayerManager.Song> result =
+                new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (PlayerManager.Song song : songs) {
-            if (seen.add(song.artist)) result.add(song);
+            if (seen.add(song.artist)) {
+                result.add(song);
+            }
         }
         refresh(result, result.size() + " artistas");
     }
 
     private void showUniqueAlbums() {
-        List<PlayerManager.Song> result = new ArrayList<>();
+        List<PlayerManager.Song> result =
+                new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (PlayerManager.Song song : songs) {
-            if (seen.add(song.album)) result.add(song);
+            if (seen.add(song.album)) {
+                result.add(song);
+            }
         }
         refresh(result, result.size() + " álbuns");
     }
@@ -574,46 +662,127 @@ public class AurenHomeV3Activity extends Activity
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         box.addView(title);
 
-        addDrawerButton(box, "Biblioteca", () -> closeDrawer());
+        addDrawerButton(box, "Biblioteca", this::closeDrawer);
         addDrawerButton(box, "Definições", () -> {
             closeDrawer();
-            startActivity(new Intent(this, SettingsActivity.class));
+            startActivity(new Intent(
+                    this, SettingsActivity.class));
         });
         addDrawerButton(box, "Recarregar músicas", () -> {
             closeDrawer();
             loadSongs();
         });
 
-        drawer = new PopupWindow(box, dp(300), -1, true);
-        drawer.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(
-                panel()));
+        drawer = new PopupWindow(
+                box, dp(300), -1, true);
+        drawer.setBackgroundDrawable(
+                new android.graphics.drawable.ColorDrawable(
+                        panel()));
         drawer.setElevation(dp(10));
-        drawer.showAtLocation(grid, Gravity.START, 0, 0);
+        drawer.showAtLocation(
+                list, Gravity.START, 0, 0);
     }
 
     private void addDrawerButton(
-            LinearLayout box, String label, Runnable action) {
+            LinearLayout box,
+            String label,
+            Runnable action) {
         Button button = new Button(this);
         button.setText(label);
         button.setTextColor(mainText());
         button.setAllCaps(false);
         button.setOnClickListener(v -> action.run());
         box.addView(button,
-                new LinearLayout.LayoutParams(-1, dp(54)));
+                new LinearLayout.LayoutParams(
+                        -1, dp(54)));
     }
 
     private void closeDrawer() {
-        if (drawer != null && drawer.isShowing()) drawer.dismiss();
+        if (drawer != null && drawer.isShowing()) {
+            drawer.dismiss();
+        }
     }
 
     private void showMainMenu() {
-        String[] items = {"Atualizar biblioteca", "Definições"};
+        String[] items = {
+                "Atualizar biblioteca", "Definições"
+        };
         new AlertDialog.Builder(this)
                 .setItems(items, (d, which) -> {
-                    if (which == 0) loadSongs();
-                    else startActivity(new Intent(
-                            this, SettingsActivity.class));
+                    if (which == 0) {
+                        loadSongs();
+                    } else {
+                        startActivity(new Intent(
+                                this, SettingsActivity.class));
+                    }
                 }).show();
+    }
+
+    private void songMenu(PlayerManager.Song song) {
+        String[] items = {
+                "REPRODUZIR",
+                "REPRODUZIR A SEGUIR",
+                "ADICIONAR AOS FAVORITOS",
+                "DETALHES",
+                "ENVIAR"
+        };
+        new AlertDialog.Builder(this)
+                .setItems(items, (d, which) -> {
+                    if (which == 0) {
+                        playSong(song);
+                    } else if (which == 1) {
+                        PlayerManager.play(this, song);
+                        Toast.makeText(
+                                this,
+                                "A reproduzir a seguir: "
+                                        + song.title,
+                                Toast.LENGTH_SHORT).show();
+                    } else if (which == 2) {
+                        toggleFavorite(song);
+                    } else if (which == 3) {
+                        details(song);
+                    } else {
+                        share(song);
+                    }
+                }).show();
+    }
+
+    private void toggleFavorite(PlayerManager.Song song) {
+        Set<String> favorites = new HashSet<>(
+                prefs.getStringSet(
+                        "favorites", new HashSet<>()));
+        if (!favorites.add(song.uri.toString())) {
+            favorites.remove(song.uri.toString());
+        }
+        prefs.edit()
+                .putStringSet("favorites", favorites)
+                .apply();
+        Toast.makeText(
+                this,
+                "Favoritos atualizados",
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void details(PlayerManager.Song song) {
+        String message = "Título: " + song.title
+                + "\nArtista: " + song.artist
+                + "\nÁlbum: " + song.album
+                + "\nDuração: " + format(song.duration);
+        new AlertDialog.Builder(this)
+                .setTitle("Detalhes")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void share(PlayerManager.Song song) {
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");
+        intent.putExtra(
+                Intent.EXTRA_TEXT,
+                song.title + " — " + song.artist);
+        startActivity(Intent.createChooser(
+                intent, "Enviar música"));
     }
 
     private Button icon(String value, int color, int size) {
@@ -628,7 +797,10 @@ public class AurenHomeV3Activity extends Activity
         return button;
     }
 
-    private TextView text(String value, float size, int color) {
+    private TextView text(
+            String value,
+            float size,
+            int color) {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(size);
@@ -637,7 +809,8 @@ public class AurenHomeV3Activity extends Activity
     }
 
     private android.graphics.drawable.GradientDrawable round(
-            int color, int radius) {
+            int color,
+            int radius) {
         android.graphics.drawable.GradientDrawable drawable =
                 new android.graphics.drawable.GradientDrawable();
         drawable.setColor(color);
@@ -651,11 +824,15 @@ public class AurenHomeV3Activity extends Activity
     }
 
     private int bg() {
-        return dark ? Color.rgb(22, 24, 28) : Color.rgb(247, 248, 250);
+        return dark
+                ? Color.rgb(22, 24, 28)
+                : Color.rgb(247, 248, 250);
     }
 
     private int panel() {
-        return dark ? Color.rgb(34, 36, 42) : Color.WHITE;
+        return dark
+                ? Color.rgb(34, 36, 42)
+                : Color.WHITE;
     }
 
     private int mainText() {
@@ -663,11 +840,25 @@ public class AurenHomeV3Activity extends Activity
     }
 
     private int muted() {
-        return dark ? Color.rgb(175, 178, 185) : MUTED;
+        return dark
+                ? Color.rgb(175, 178, 185)
+                : MUTED;
+    }
+
+    private String format(long milliseconds) {
+        long totalSeconds = Math.max(0, milliseconds / 1000);
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        return String.format(
+                Locale.ROOT,
+                "%d:%02d",
+                minutes,
+                seconds);
     }
 
     private String safe(String value, String fallback) {
-        if (value == null || value.trim().isEmpty()
+        if (value == null
+                || value.trim().isEmpty()
                 || "<unknown>".equalsIgnoreCase(value)) {
             return fallback;
         }
