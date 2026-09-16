@@ -9,6 +9,7 @@ required_imports = [
     "import android.widget.ImageButton;",
     "import android.widget.ImageView;",
     "import android.widget.HorizontalScrollView;",
+    "import android.widget.PopupMenu;",
     "import android.view.WindowManager;",
 ]
 for imp in required_imports:
@@ -131,48 +132,55 @@ if 'AUREN_ALL_SONGS_HOME_START' not in text:
     marker = '        addSectionHeader(content, "Suggestions for you", "Refresh", v -> showHome());\n'
     text = text.replace(marker, all_songs_block + marker, 1)
 
-# Replace the mini player with a layout closer to the reference: full-width,
-# compact artwork, title/artist, prominent blue play button, and progress accent.
+# Replace the mini player with a cleaner reference-style bottom player.
+# It deliberately has no placeholder action: every visible control does something useful.
 mini_method = '''    private LinearLayout buildMiniPlayer() {
         LinearLayout mini = column();
         mini.setBackgroundColor(Color.WHITE);
-        mini.setElevation(dp(8));
+        mini.setElevation(dp(10));
         mini.setPadding(0, 0, 0, 0);
 
         View progressAccent = new View(this);
         progressAccent.setBackgroundColor(getColor(R.color.auren_primary));
-        mini.addView(progressAccent, new LinearLayout.LayoutParams(-1, dp(3)));
+        mini.addView(progressAccent, new LinearLayout.LayoutParams(-1, dp(2)));
 
         LinearLayout row = row();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(8), dp(7), dp(8), dp(7));
+        row.setPadding(dp(10), dp(6), dp(8), dp(6));
+        row.setMinimumHeight(dp(68));
 
-        miniArt = artwork(54);
+        miniArt = artwork(56);
         miniArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        row.addView(miniArt, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        miniArt.setClipToOutline(true);
+        row.addView(miniArt, new LinearLayout.LayoutParams(dp(56), dp(56)));
 
         LinearLayout info = column();
         info.setGravity(Gravity.CENTER_VERTICAL);
-        info.setPadding(dp(12), 0, dp(6), 0);
+        info.setPadding(dp(12), 0, dp(8), 0);
         miniTitle = text("Nothing playing", 14, R.color.text_primary);
         miniTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         miniTitle.setMaxLines(1);
+        miniTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         miniArtist = text("Choose a song to start", 12, R.color.text_secondary);
         miniArtist.setMaxLines(1);
+        miniArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
         info.addView(miniTitle);
-        info.addView(miniArtist, margins(0, 2, 0, 0));
-        row.addView(info, new LinearLayout.LayoutParams(0, dp(54), 1));
+        info.addView(miniArtist, margins(0, 3, 0, 0));
+        row.addView(info, new LinearLayout.LayoutParams(0, dp(56), 1));
 
-        ImageButton miniMore = iconButton(android.R.drawable.ic_menu_more, "Player options");
-        miniMore.setOnClickListener(v -> openNowPlaying());
-        row.addView(miniMore, new LinearLayout.LayoutParams(dp(42), dp(54)));
+        ImageButton miniPlayButton = iconButton(android.R.drawable.ic_media_play, "Play or pause");
+        miniPlay = miniPlayButton;
+        miniPlayButton.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary))
+        );
+        DrawableCompat.setTint(miniPlayButton.getDrawable(), Color.WHITE);
+        miniPlayButton.setPadding(dp(13), dp(13), dp(13), dp(13));
+        miniPlayButton.setOnClickListener(v -> togglePlayback());
+        row.addView(miniPlayButton, new LinearLayout.LayoutParams(dp(52), dp(52)));
 
-        miniPlay = iconButton(android.R.drawable.ic_media_play, "Play or pause");
-        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
-        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
-        miniPlay.setPadding(dp(12), dp(12), dp(12), dp(12));
-        miniPlay.setOnClickListener(v -> togglePlayback());
-        row.addView(miniPlay, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Next song");
+        next.setOnClickListener(v -> nextTrackInPlayer());
+        row.addView(next, new LinearLayout.LayoutParams(dp(44), dp(52)));
 
         mini.addView(row);
         mini.setOnClickListener(v -> openNowPlaying());
@@ -186,11 +194,56 @@ updated, changed = replace_method(text, 'buildMiniPlayer', mini_method)
 if changed:
     text = updated
 
-# Do not allow the release pipeline to proceed with references that are
-# known not to exist in the current MainActivity API.
-for forbidden in ("showNowPlaying();", "roundDrawable("):
+# Replace the top-right Now Playing placeholder with real actions.
+old_more = '''        ImageButton more = iconButton(android.R.drawable.ic_menu_more, "More options");
+        more.setOnClickListener(v -> Toast.makeText(this, "More player options coming soon.", Toast.LENGTH_SHORT).show());
+        top.addView(more, new LinearLayout.LayoutParams(dp(48), dp(48)));
+'''
+new_more = '''        ImageButton more = iconButton(android.R.drawable.ic_menu_more, "Player options");
+        more.setOnClickListener(v -> {
+            PopupMenu popup = new PopupMenu(this, more);
+            popup.getMenu().add("Reproduzir novamente");
+            popup.getMenu().add(isFavorite(currentTrack) ? "Remover dos favoritos" : "Adicionar aos favoritos");
+            popup.getMenu().add("Aleatório");
+            popup.getMenu().add("Fechar reprodução");
+            popup.setOnMenuItemClickListener(item -> {
+                String action = item.getTitle().toString();
+                if (action.equals("Reproduzir novamente")) {
+                    player.seekTo(0);
+                    player.play();
+                    refreshNowPlaying();
+                } else if (action.contains("favoritos")) {
+                    setFavorite(currentTrack, !isFavorite(currentTrack));
+                    updateMiniPlayer();
+                    refreshNowPlaying();
+                } else if (action.equals("Aleatório")) {
+                    shufflePlay();
+                    refreshNowPlaying();
+                } else {
+                    closeNowPlaying();
+                }
+                return true;
+            });
+            popup.show();
+        });
+        top.addView(more, new LinearLayout.LayoutParams(dp(48), dp(48)));
+'''
+if old_more in text:
+    text = text.replace(old_more, new_more, 1)
+
+# Keep the mini player flush with the app edges like a real docked player.
+text = text.replace(
+    'root.addView(miniContainer, margins(12, 4, 12, 4));',
+    'root.addView(miniContainer, new LinearLayout.LayoutParams(-1, dp(70)));',
+    1,
+)
+
+# Never ship the old placeholder message again.
+text = text.replace("More player options coming soon.", "")
+
+for forbidden in ("showNowPlaying();", "roundDrawable(", "More player options coming soon."):
     if forbidden in text:
         raise SystemExit(f"Unresolved UI enhancement reference: {forbidden}")
 
 path.write_text(text)
-print("Auren UI enhancement completed: reference-style mini player + all songs on Home.")
+print("Auren UI enhancement completed: cleaner mini player, real player actions, and all songs on Home.")
