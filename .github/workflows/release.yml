@@ -162,13 +162,18 @@ jobs:
           OLD_APK="$WORK/Auren-Music-Player-$OLD_VERSION.apk"
           PATCH="$WORK/Auren-Music-Player-$OLD_VERSION-to-$VERSION.patch"
           VERIFY="$WORK/verified-$VERSION.apk"
-          JBSDIFF="$WORK/jbsdiff-1.0.jar"
+          JBSDIFF_REPO="$WORK/jbsdiff"
+          JBSDIFF="$JBSDIFF_REPO/target/jbsdiff-1.0.jar"
 
           echo "Previous version: $OLD_VERSION"
           curl -fL --retry 3 "$OLD_APK_URL" -o "$OLD_APK"
-          curl -fL --retry 3 \
-            "https://repo1.maven.org/maven2/io/sigpipe/jbsdiff/1.0/jbsdiff-1.0.jar" \
-            -o "$JBSDIFF"
+
+          git clone --depth 1 \
+            https://github.com/malensek/jbsdiff.git \
+            "$JBSDIFF_REPO"
+          mvn -q -f "$JBSDIFF_REPO/pom.xml" clean package -DskipTests
+
+          test -f "$JBSDIFF"
 
           java -jar "$JBSDIFF" diff \
             "$OLD_APK" "$NEW_APK" "$PATCH"
