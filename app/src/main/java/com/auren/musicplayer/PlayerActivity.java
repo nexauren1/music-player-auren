@@ -9,29 +9,43 @@ import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import java.util.Locale;
+
 public class PlayerActivity extends Activity implements PlayerManager.Listener {
-    private static final int GREEN = Color.rgb(32, 150, 42);
-    private static final int TEXT = Color.rgb(35, 36, 40);
+    private static final int GREEN = Color.rgb(26, 142, 55);
+    private static final int GREEN_DARK = Color.rgb(18, 104, 40);
+    private static final int BG = Color.rgb(246, 248, 247);
+    private static final int CARD = Color.WHITE;
+    private static final int TEXT = Color.rgb(24, 28, 26);
+    private static final int MUTED = Color.rgb(103, 111, 106);
 
     private ImageView cover;
     private TextView title;
     private TextView artist;
     private TextView elapsed;
     private TextView total;
+    private TextView status;
     private SeekBar seekBar;
     private Button play;
     private Button shuffle;
     private Button repeat;
     private final Handler handler = new Handler();
 
-    @Override
-    protected void onCreate(Bundle state) {
+    private final Runnable updateTask = new Runnable() {
+        @Override public void run() {
+            updateProgress();
+            handler.postDelayed(this, 400);
+        }
+    };
+
+    @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         buildUi();
         PlayerManager.setListener(this);
@@ -39,150 +53,154 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
         handler.post(updateTask);
     }
 
-    private final Runnable updateTask = new Runnable() {
-        @Override
-        public void run() {
-            updateProgress();
-            handler.postDelayed(this, 500);
-        }
-    };
-
     private void buildUi() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(247, 248, 250));
+        LinearLayout root = column(BG);
 
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(8), dp(6), dp(8), dp(6));
-        top.setBackgroundColor(GREEN);
-
+        LinearLayout top = row(GREEN);
+        top.setPadding(dp(8), dp(7), dp(8), dp(7));
         Button back = button("‹", 32, Color.WHITE);
-        top.addView(back, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        top.addView(back, size(54, 52));
         back.setOnClickListener(v -> finish());
 
-        TextView heading = text("AUREN PLAYER", 19, Color.WHITE);
+        TextView heading = text("AUREN PLAYER", 18, Color.WHITE);
         heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        top.addView(heading, new LinearLayout.LayoutParams(0, dp(54), 1));
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(heading, weight(1, 52));
+
+        Button queue = button("☷", 24, Color.WHITE);
+        top.addView(queue, size(52, 52));
+        queue.setOnClickListener(v -> showQueue());
         root.addView(top);
 
-        LinearLayout body = new LinearLayout(this);
-        body.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout body = column(BG);
         body.setGravity(Gravity.CENTER_HORIZONTAL);
-        body.setPadding(dp(24), dp(28), dp(24), dp(18));
+        body.setPadding(dp(22), dp(22), dp(22), dp(14));
 
+        status = text("A tocar agora", 12, GREEN);
+        status.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        status.setGravity(Gravity.CENTER);
+        body.addView(status, size(-1, 28));
+
+        LinearLayout artFrame = column(CARD);
+        artFrame.setGravity(Gravity.CENTER);
+        artFrame.setPadding(dp(8), dp(8), dp(8), dp(8));
+        artFrame.setElevation(dp(4));
         cover = new ImageView(this);
         cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        body.addView(cover, new LinearLayout.LayoutParams(dp(280), dp(280)));
+        cover.setBackground(round(Color.rgb(232, 239, 234), 22));
+        artFrame.addView(cover, size(286, 286));
+        LinearLayout.LayoutParams artParams = size(302, 302);
+        artParams.topMargin = dp(8);
+        body.addView(artFrame, artParams);
 
-        title = text("Nenhuma música", 22, TEXT);
-        title.setGravity(Gravity.CENTER);
+        title = text("Nenhuma música", 23, TEXT);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
         title.setMaxLines(2);
-        LinearLayout.LayoutParams titleParams =
-                new LinearLayout.LayoutParams(-1, -2);
-        titleParams.topMargin = dp(24);
+        LinearLayout.LayoutParams titleParams = size(-1, -2);
+        titleParams.topMargin = dp(22);
         body.addView(title, titleParams);
 
-        artist = text("Escolha uma música", 14, Color.rgb(105, 108, 116));
+        artist = text("Escolhe uma música", 14, MUTED);
         artist.setGravity(Gravity.CENTER);
         artist.setMaxLines(2);
-        body.addView(artist);
+        body.addView(artist, size(-1, 34));
 
         seekBar = new SeekBar(this);
-        LinearLayout.LayoutParams seekParams =
-                new LinearLayout.LayoutParams(-1, dp(42));
-        seekParams.topMargin = dp(22);
+        seekBar.setPadding(0, 0, 0, 0);
+        LinearLayout.LayoutParams seekParams = size(-1, 38);
+        seekParams.topMargin = dp(14);
         body.addView(seekBar, seekParams);
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
+            @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
                 if (fromUser) elapsed.setText(format(value));
             }
-
-            public void onStartTrackingTouch(SeekBar bar) {
-            }
-
-            public void onStopTrackingTouch(SeekBar bar) {
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
                 PlayerManager.seekTo(bar.getProgress());
             }
         });
 
-        LinearLayout times = new LinearLayout(this);
-        elapsed = text("0:00", 12, Color.GRAY);
-        total = text("0:00", 12, Color.GRAY);
-        times.addView(elapsed, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout times = row(BG);
+        elapsed = text("0:00", 12, MUTED);
+        total = text("0:00", 12, MUTED);
+        times.addView(elapsed, weight(1, 24));
         total.setGravity(Gravity.RIGHT);
-        times.addView(total, new LinearLayout.LayoutParams(0, -2, 1));
+        times.addView(total, weight(1, 24));
         body.addView(times);
 
-        LinearLayout controls = new LinearLayout(this);
+        LinearLayout controls = row(BG);
         controls.setGravity(Gravity.CENTER);
-        controls.setPadding(0, dp(18), 0, 0);
+        controls.setPadding(0, dp(12), 0, dp(4));
 
-        shuffle = button("🔀", 22, GREEN);
-        controls.addView(shuffle, new LinearLayout.LayoutParams(dp(58), dp(58)));
+        shuffle = button("🔀", 20, GREEN);
+        controls.addView(shuffle, size(52, 58));
         shuffle.setOnClickListener(v -> {
             PlayerManager.setShuffle(!PlayerManager.isShuffle());
             updateButtons();
         });
 
-        Button previous = button("|◀", 22, TEXT);
-        controls.addView(previous, new LinearLayout.LayoutParams(dp(68), dp(68)));
-        previous.setOnClickListener(v ->
-                PlayerManager.previous(this, PlayerManager.getQueue()));
+        Button previous = button("|◀", 21, TEXT);
+        controls.addView(previous, size(58, 58));
+        previous.setOnClickListener(v -> PlayerManager.previous(this, PlayerManager.getQueue()));
 
-        play = button("▶", 30, Color.WHITE);
-        play.setBackgroundColor(GREEN);
-        controls.addView(play, new LinearLayout.LayoutParams(dp(78), dp(78)));
+        play = button("▶", 29, Color.WHITE);
+        play.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        play.setBackground(round(GREEN, 32));
+        controls.addView(play, size(76, 64));
         play.setOnClickListener(v -> PlayerManager.toggle());
 
-        Button next = button("▶|", 22, TEXT);
-        controls.addView(next, new LinearLayout.LayoutParams(dp(68), dp(68)));
-        next.setOnClickListener(v ->
-                PlayerManager.next(this, PlayerManager.getQueue()));
+        Button next = button("▶|", 21, TEXT);
+        controls.addView(next, size(58, 58));
+        next.setOnClickListener(v -> PlayerManager.next(this, PlayerManager.getQueue()));
 
         repeat = button("↻", 22, GREEN);
-        controls.addView(repeat, new LinearLayout.LayoutParams(dp(58), dp(58)));
+        controls.addView(repeat, size(52, 58));
         repeat.setOnClickListener(v -> {
             PlayerManager.setRepeat(!PlayerManager.isRepeat());
             updateButtons();
         });
         body.addView(controls);
 
-        Button queueButton = button("☷  FILA DE REPRODUÇÃO", 15, GREEN);
-        queueButton.setBackgroundColor(Color.TRANSPARENT);
-        body.addView(queueButton, new LinearLayout.LayoutParams(-1, dp(52)));
+        Button queueButton = button("☷   FILA DE REPRODUÇÃO", 14, GREEN);
+        queueButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        queueButton.setBackground(round(CARD, 18));
+        LinearLayout.LayoutParams qp = size(-1, 52);
+        qp.topMargin = dp(6);
+        body.addView(queueButton, qp);
         queueButton.setOnClickListener(v -> showQueue());
 
-        root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(body, weight(1, 0));
         setContentView(root);
         updateButtons();
     }
 
     private void refreshTrack() {
         PlayerManager.Song current = PlayerManager.getCurrentSong();
-        if (current == null) return;
+        if (current == null) {
+            status.setText("Escolhe uma música");
+            return;
+        }
         title.setText(current.title);
-        artist.setText(current.artist + " · " + current.album);
+        artist.setText(current.artist + " • " + current.album);
+        status.setText(PlayerManager.isPlaying() ? "A tocar agora" : "Em pausa");
         loadArtwork(current);
         updateProgress();
     }
 
     private void showQueue() {
         PlayerManager.Song[] queue = PlayerManager.getQueue();
-        StringBuilder text = new StringBuilder();
+        StringBuilder message = new StringBuilder();
+        PlayerManager.Song current = PlayerManager.getCurrentSong();
         for (int i = 0; i < queue.length; i++) {
-            boolean current = queue[i].uri.equals(
-                    PlayerManager.getCurrentSong() == null
-                            ? null : PlayerManager.getCurrentSong().uri);
-            text.append(current ? "▶ " : "   ")
+            boolean selected = current != null && queue[i].uri.equals(current.uri);
+            message.append(selected ? "▶  " : "    ")
                     .append(i + 1).append(". ")
                     .append(queue[i].title).append("\n");
         }
         new android.app.AlertDialog.Builder(this)
                 .setTitle("Fila de reprodução")
-                .setMessage(text.length() == 0
-                        ? "A fila está vazia." : text.toString())
+                .setMessage(message.length() == 0 ? "A fila está vazia." : message.toString())
                 .setPositiveButton("Fechar", null)
                 .show();
     }
@@ -201,16 +219,20 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
     private void updateButtons() {
         if (play == null) return;
         play.setText(PlayerManager.isPlaying() ? "Ⅱ" : "▶");
-        shuffle.setAlpha(PlayerManager.isShuffle() ? 1f : 0.45f);
-        repeat.setAlpha(PlayerManager.isRepeat() ? 1f : 0.45f);
+        status.setText(PlayerManager.isPlaying() ? "A tocar agora" : "Em pausa");
+        shuffle.setAlpha(PlayerManager.isShuffle() ? 1f : 0.42f);
+        repeat.setAlpha(PlayerManager.isRepeat() ? 1f : 0.42f);
     }
 
-    @Override
-    public void onPlayerChanged() {
+    @Override public void onPlayerChanged() {
         runOnUiThread(() -> {
             refreshTrack();
             updateButtons();
         });
+    }
+
+    @Override public void onPlayerError(String message) {
+        runOnUiThread(() -> status.setText("Não foi possível reproduzir"));
     }
 
     private void loadArtwork(PlayerManager.Song song) {
@@ -232,12 +254,28 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
         }
     }
 
+    private LinearLayout row(int color) {
+        LinearLayout value = new LinearLayout(this);
+        value.setOrientation(LinearLayout.HORIZONTAL);
+        value.setBackgroundColor(color);
+        return value;
+    }
+
+    private LinearLayout column(int color) {
+        LinearLayout value = new LinearLayout(this);
+        value.setOrientation(LinearLayout.VERTICAL);
+        value.setBackgroundColor(color);
+        return value;
+    }
+
     private Button button(String value, int size, int color) {
         Button b = new Button(this);
         b.setText(value);
         b.setTextSize(size);
         b.setTextColor(color);
         b.setAllCaps(false);
+        b.setMinHeight(0);
+        b.setMinWidth(0);
         return b;
     }
 
@@ -249,18 +287,31 @@ public class PlayerActivity extends Activity implements PlayerManager.Listener {
         return t;
     }
 
+    private LinearLayout.LayoutParams size(int width, int height) {
+        return new LinearLayout.LayoutParams(width < 0 ? width : dp(width), height < 0 ? height : dp(height));
+    }
+
+    private LinearLayout.LayoutParams weight(float value, int height) {
+        return new LinearLayout.LayoutParams(0, height < 0 ? height : dp(height), value);
+    }
+
+    private android.graphics.drawable.GradientDrawable round(int color, int radius) {
+        android.graphics.drawable.GradientDrawable drawable = new android.graphics.drawable.GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radius));
+        return drawable;
+    }
+
     private String format(long millis) {
         long seconds = Math.max(0, millis / 1000);
-        return String.format(java.util.Locale.getDefault(),
-                "%d:%02d", seconds / 60, seconds % 60);
+        return String.format(Locale.getDefault(), "%d:%02d", seconds / 60, seconds % 60);
     }
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    @Override
-    protected void onDestroy() {
+    @Override protected void onDestroy() {
         handler.removeCallbacks(updateTask);
         PlayerManager.setListener(null);
         super.onDestroy();
