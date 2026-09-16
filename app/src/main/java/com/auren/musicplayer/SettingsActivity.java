@@ -2,6 +2,7 @@ package com.auren.musicplayer;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -46,17 +47,20 @@ public class SettingsActivity extends Activity {
         bar.setBackgroundColor(GREEN);
 
         Button back = button("‹", 32, Color.WHITE);
-        bar.addView(back, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        bar.addView(back, new LinearLayout.LayoutParams(
+                dp(54), dp(54)));
         back.setOnClickListener(v -> finish());
 
         TextView title = text("CONFIGURAÇÕES", 18, Color.WHITE);
         title.setTypeface(null, 1);
-        bar.addView(title, new LinearLayout.LayoutParams(0, dp(54), 1));
+        bar.addView(title, new LinearLayout.LayoutParams(
+                0, dp(54), 1));
         root.addView(bar);
 
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(20), dp(20), dp(20));
+        content.setPadding(dp(20), dp(20), dp(20), dp(30));
 
         addSection(content, "APARÊNCIA", textColor);
         Switch darkSwitch = new Switch(this);
@@ -72,6 +76,22 @@ public class SettingsActivity extends Activity {
             recreate();
         });
 
+        addSection(content, "REPRODUÇÃO", textColor);
+        addInfo(content, "Reprodução em segundo plano",
+                "O Auren mantém a reprodução ativa através do serviço de mídia.",
+                textColor, muted);
+        addInfo(content, "Controles",
+                "Play, pausa, anterior, próxima, aleatório e repetir estão disponíveis no player.",
+                textColor, muted);
+
+        Button effects = button(
+                "Abrir efeitos de áudio", 15, GREEN);
+        effects.setGravity(Gravity.CENTER);
+        content.addView(effects,
+                new LinearLayout.LayoutParams(-1, dp(52)));
+        effects.setOnClickListener(v -> startActivity(
+                new Intent(this, EffectsActivity.class)));
+
         addSection(content, "ATUALIZAÇÕES", textColor);
         addInfo(content, "Auren Music Player",
                 "Versão instalada: " + BuildConfig.VERSION_NAME,
@@ -83,20 +103,12 @@ public class SettingsActivity extends Activity {
                 new LinearLayout.LayoutParams(-1, dp(52)));
         checkUpdates.setOnClickListener(v -> checkForUpdates());
 
-        addSection(content, "REPRODUÇÃO", textColor);
-        addInfo(content, "Reprodução em segundo plano",
-                "O Auren mantém a reprodução ativa através do serviço de mídia.",
-                textColor, muted);
-        addInfo(content, "Controles",
-                "Use play, pausa, anterior, próxima, aleatório e repetir no player.",
-                textColor, muted);
-
         addSection(content, "BIBLIOTECA", textColor);
         addInfo(content, "Músicas locais",
                 "A biblioteca é lida diretamente do MediaStore do dispositivo.",
                 textColor, muted);
-        addInfo(content, "Atualização",
-                "Volte à página inicial para atualizar a lista de músicas disponíveis.",
+        addInfo(content, "Favoritos e recentes",
+                "Favoritos e histórico recente ficam guardados localmente no Auren.",
                 textColor, muted);
 
         addSection(content, "PRIVACIDADE", textColor);
@@ -110,7 +122,8 @@ public class SettingsActivity extends Activity {
                         + " · Player local para Android",
                 textColor, muted);
 
-        root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
+        scroll.addView(content);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
     }
 
@@ -177,15 +190,20 @@ public class SettingsActivity extends Activity {
         super.onDestroy();
     }
 
-    private void addSection(LinearLayout parent, String value, int textColor) {
+    private void addSection(
+            LinearLayout parent, String value, int textColor) {
         TextView section = text(value, 13, GREEN);
         section.setTypeface(null, 1);
         section.setPadding(0, dp(20), 0, dp(8));
         parent.addView(section);
     }
 
-    private void addInfo(LinearLayout parent, String title, String description,
-                         int textColor, int muted) {
+    private void addInfo(
+            LinearLayout parent,
+            String title,
+            String description,
+            int textColor,
+            int muted) {
         TextView t = text(title, 16, textColor);
         t.setTypeface(null, 1);
         t.setPadding(0, dp(10), 0, dp(2));
@@ -214,6 +232,7 @@ public class SettingsActivity extends Activity {
     }
 
     private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        return (int) (value
+                * getResources().getDisplayMetrics().density + 0.5f);
     }
 }
