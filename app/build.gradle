@@ -10,8 +10,8 @@ android {
         applicationId 'com.auren.musicplayer'
         minSdk 23
         targetSdk 35
-        versionCode 7
-        versionName '1.5.1'
+        versionCode 8
+        versionName '1.6.0'
     }
 
     compileOptions {
@@ -26,5 +26,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
                     'proguard-rules.pro'
         }
+    }
+
+    dependencies {
+        implementation 'androidx.media3:media3-exoplayer:1.11.0'
     }
 }
