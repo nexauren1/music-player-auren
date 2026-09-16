@@ -1,9 +1,11 @@
 package com.auren.musicplayer;
 
 import android.content.Context;
+import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Build;
 
 public final class PlayerManager {
     public interface Listener {
@@ -14,6 +16,7 @@ public final class PlayerManager {
     private static Song currentSong;
     private static Song[] queue = new Song[0];
     private static Listener listener;
+    private static Context appContext;
     private static boolean shuffle;
     private static boolean repeat;
 
@@ -72,32 +75,34 @@ public final class PlayerManager {
 
     public static void play(Context context, Song song) {
         if (song == null || song.uri == null) return;
-        release();
+        appContext = context.getApplicationContext();
+        startPlaybackService();
+        releasePlayerOnly();
         currentSong = song;
         try {
             player = new MediaPlayer();
             player.setAudioStreamType(AudioManager.STREAM_MUSIC);
-            player.setDataSource(context.getApplicationContext(), song.uri);
+            player.setDataSource(appContext, song.uri);
             player.setOnPreparedListener(mp -> {
                 mp.start();
                 notifyChanged();
             });
-            player.setOnCompletionListener(mp -> handleCompletion(context));
+            player.setOnCompletionListener(mp -> handleCompletion());
             player.setOnErrorListener((mp, what, extra) -> {
-                release();
+                releasePlayerOnly();
                 notifyChanged();
                 return true;
             });
             player.prepareAsync();
             notifyChanged();
         } catch (Exception e) {
-            release();
+            releasePlayerOnly();
             notifyChanged();
         }
     }
 
-    private static void handleCompletion(Context context) {
-        if (repeat && player != null) {
+    private static void handleCompletion() {
+        if (repeat && player != null && appContext != null) {
             try {
                 player.seekTo(0);
                 player.start();
@@ -106,8 +111,8 @@ public final class PlayerManager {
             } catch (Exception ignored) {
             }
         }
-        if (queue.length > 1) {
-            next(context, queue);
+        if (queue.length > 1 && appContext != null) {
+            next(appContext, queue);
         } else {
             notifyChanged();
         }
@@ -134,6 +139,7 @@ public final class PlayerManager {
     public static void next(Context context, Song[] songs) {
         Song[] source = songs == null ? queue : songs;
         if (source.length == 0) return;
+        appContext = context.getApplicationContext();
         queue = source.clone();
         int index = indexOf(source, currentSong);
         int next;
@@ -144,12 +150,13 @@ public final class PlayerManager {
         } else {
             next = (index + 1) % source.length;
         }
-        play(context, source[next]);
+        play(appContext, source[next]);
     }
 
     public static void previous(Context context, Song[] songs) {
         Song[] source = songs == null ? queue : songs;
         if (source.length == 0) return;
+        appContext = context.getApplicationContext();
         queue = source.clone();
         if (getPosition() > 3000) {
             seekTo(0);
@@ -158,7 +165,7 @@ public final class PlayerManager {
         int index = indexOf(source, currentSong);
         int previous = index - 1;
         if (previous < 0) previous = source.length - 1;
-        play(context, source[previous]);
+        play(appContext, source[previous]);
     }
 
     public static void setShuffle(boolean value) {
@@ -172,6 +179,10 @@ public final class PlayerManager {
     }
 
     public static void release() {
+        releasePlayerOnly();
+    }
+
+    private static void releasePlayerOnly() {
         if (player != null) {
             try {
                 player.stop();
@@ -185,16 +196,37 @@ public final class PlayerManager {
         }
     }
 
+    private static void startPlaybackService() {
+        if (appContext == null) return;
+        Intent intent = new Intent(appContext, PlaybackService.class);
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                appContext.startForegroundService(intent);
+            } else {
+                appContext.startService(intent);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void notifyChanged() {
+        if (listener != null) listener.onPlayerChanged();
+        if (appContext != null) {
+            Intent intent = new Intent(appContext, PlaybackService.class);
+            intent.setAction(PlaybackService.ACTION_UPDATE);
+            try {
+                appContext.startService(intent);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     private static int indexOf(Song[] songs, Song song) {
         if (song == null) return 0;
         for (int i = 0; i < songs.length; i++) {
             if (songs[i].uri.equals(song.uri)) return i;
         }
         return 0;
-    }
-
-    private static void notifyChanged() {
-        if (listener != null) listener.onPlayerChanged();
     }
 
     public static final class Song {
