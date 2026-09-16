@@ -49,18 +49,11 @@ jobs:
           set -euo pipefail
           test -n "$AUREN_KEYSTORE_B64"
           test -n "$AUREN_STORE_PASS"
-
           KEYSTORE="$RUNNER_TEMP/auren-release.keystore"
           CLEAN_B64=$(printf '%s' "$AUREN_KEYSTORE_B64" | tr -d '[:space:]')
-
           printf '%s' "$CLEAN_B64" | base64 --decode > "$KEYSTORE"
           test -s "$KEYSTORE"
-
-          keytool -list \
-            -keystore "$KEYSTORE" \
-            -storepass "$AUREN_STORE_PASS" \
-            >/dev/null
-
+          keytool -list -keystore "$KEYSTORE" -storepass "$AUREN_STORE_PASS" >/dev/null
           echo "Release keystore decoded and validated successfully."
 
       - name: Build signed release APK
@@ -71,6 +64,15 @@ jobs:
           AUREN_STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
         run: gradle --no-daemon clean assembleRelease --stacktrace
 
+      - name: Read app version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION_NAME=$(grep -o "versionName '[^']*'" app/build.gradle | head -1 | cut -d"'" -f2)
+          test -n "$VERSION_NAME"
+          echo "version=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION_NAME"
+
       - name: Verify APK
         run: |
           set -euo pipefail
@@ -80,9 +82,11 @@ jobs:
 
       - name: Prepare release metadata
         id: release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          RELEASE_TAG="v3.1.1-build.${GITHUB_RUN_NUMBER}"
+          RELEASE_TAG="v${VERSION}-build.${GITHUB_RUN_NUMBER}"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           cp app/build/outputs/apk/release/app-release.apk "Auren-Music-Player-${RELEASE_TAG}.apk"
           sha256sum "Auren-Music-Player-${RELEASE_TAG}.apk" > "Auren-Music-Player-${RELEASE_TAG}.apk.sha256"
@@ -98,19 +102,19 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.1.1-build.${{ github.run_number }}
+          tag_name: ${{ steps.release.outputs.tag }}
           target_commitish: main
-          name: Auren Music Player v3.1.1-build.${{ github.run_number }}
+          name: Auren Music Player ${{ steps.release.outputs.tag }}
           body: |
-            ## Auren Music Player v3.1.1-build.${{ github.run_number }}
+            ## Auren Music Player ${{ steps.release.outputs.tag }}
 
             Signed release APK generated automatically from `main`.
 
             - Android package: `com.auren.musicplayer`
-            - Version: `3.1.1`
+            - Version: `${{ steps.version.outputs.version }}`
             - APK is signed with the project's protected release key.
             - SHA-256 checksum is included as a release asset.
           files: |
-            Auren-Music-Player-v3.1.1-build.${{ github.run_number }}.apk
-            Auren-Music-Player-v3.1.1-build.${{ github.run_number }}.apk.sha256
+            Auren-Music-Player-${{ steps.release.outputs.tag }}.apk
+            Auren-Music-Player-${{ steps.release.outputs.tag }}.apk.sha256
           fail_on_unmatched_files: true
