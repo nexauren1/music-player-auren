@@ -92,7 +92,7 @@ public class MainActivity extends ComponentActivity {
         root.addView(pageContainer, new LinearLayout.LayoutParams(-1, 0, 1));
 
         miniContainer = buildMiniPlayer();
-        root.addView(miniContainer, margins(12, 4, 12, 4));
+        root.addView(miniContainer, new LinearLayout.LayoutParams(-1, dp(70)));
         root.addView(buildBottomNavigation());
         setContentView(root);
         showHome();
@@ -582,43 +582,50 @@ public class MainActivity extends ComponentActivity {
     private LinearLayout buildMiniPlayer() {
         LinearLayout mini = column();
         mini.setBackgroundColor(Color.WHITE);
-        mini.setElevation(dp(8));
+        mini.setElevation(dp(10));
         mini.setPadding(0, 0, 0, 0);
 
         View progressAccent = new View(this);
         progressAccent.setBackgroundColor(getColor(R.color.auren_primary));
-        mini.addView(progressAccent, new LinearLayout.LayoutParams(-1, dp(3)));
+        mini.addView(progressAccent, new LinearLayout.LayoutParams(-1, dp(2)));
 
         LinearLayout row = row();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(8), dp(7), dp(8), dp(7));
+        row.setPadding(dp(10), dp(6), dp(8), dp(6));
+        row.setMinimumHeight(dp(68));
 
-        miniArt = artwork(54);
+        miniArt = artwork(56);
         miniArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        row.addView(miniArt, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        miniArt.setClipToOutline(true);
+        row.addView(miniArt, new LinearLayout.LayoutParams(dp(56), dp(56)));
 
         LinearLayout info = column();
         info.setGravity(Gravity.CENTER_VERTICAL);
-        info.setPadding(dp(12), 0, dp(6), 0);
+        info.setPadding(dp(12), 0, dp(8), 0);
         miniTitle = text("Nothing playing", 14, R.color.text_primary);
         miniTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         miniTitle.setMaxLines(1);
+        miniTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         miniArtist = text("Choose a song to start", 12, R.color.text_secondary);
         miniArtist.setMaxLines(1);
+        miniArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
         info.addView(miniTitle);
-        info.addView(miniArtist, margins(0, 2, 0, 0));
-        row.addView(info, new LinearLayout.LayoutParams(0, dp(54), 1));
+        info.addView(miniArtist, margins(0, 3, 0, 0));
+        row.addView(info, new LinearLayout.LayoutParams(0, dp(56), 1));
 
-        ImageButton miniMore = iconButton(android.R.drawable.ic_menu_more, "Player options");
-        miniMore.setOnClickListener(v -> openNowPlaying());
-        row.addView(miniMore, new LinearLayout.LayoutParams(dp(42), dp(54)));
+        ImageButton miniPlayButton = iconButton(android.R.drawable.ic_media_play, "Play or pause");
+        miniPlay = miniPlayButton;
+        miniPlayButton.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary))
+        );
+        DrawableCompat.setTint(miniPlayButton.getDrawable(), Color.WHITE);
+        miniPlayButton.setPadding(dp(13), dp(13), dp(13), dp(13));
+        miniPlayButton.setOnClickListener(v -> togglePlayback());
+        row.addView(miniPlayButton, new LinearLayout.LayoutParams(dp(52), dp(52)));
 
-        miniPlay = iconButton(android.R.drawable.ic_media_play, "Play or pause");
-        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
-        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
-        miniPlay.setPadding(dp(12), dp(12), dp(12), dp(12));
-        miniPlay.setOnClickListener(v -> togglePlayback());
-        row.addView(miniPlay, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Next song");
+        next.setOnClickListener(v -> nextTrackInPlayer());
+        row.addView(next, new LinearLayout.LayoutParams(dp(44), dp(52)));
 
         mini.addView(row);
         mini.setOnClickListener(v -> openNowPlaying());
@@ -627,6 +634,7 @@ public class MainActivity extends ComponentActivity {
         miniArtist.setOnClickListener(v -> openNowPlaying());
         return mini;
     }
+
 
 
     private void openNowPlaying() {
@@ -663,8 +671,33 @@ public class MainActivity extends ComponentActivity {
         label.setGravity(Gravity.CENTER);
         label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         top.addView(label, new LinearLayout.LayoutParams(0, dp(48), 1));
-        ImageButton more = iconButton(android.R.drawable.ic_menu_more, "More options");
-        more.setOnClickListener(v -> Toast.makeText(this, "More player options coming soon.", Toast.LENGTH_SHORT).show());
+        ImageButton more = iconButton(android.R.drawable.ic_menu_more, "Player options");
+        more.setOnClickListener(v -> {
+            PopupMenu popup = new PopupMenu(this, more);
+            popup.getMenu().add("Reproduzir novamente");
+            popup.getMenu().add(isFavorite(currentTrack) ? "Remover dos favoritos" : "Adicionar aos favoritos");
+            popup.getMenu().add("Aleatório");
+            popup.getMenu().add("Fechar reprodução");
+            popup.setOnMenuItemClickListener(item -> {
+                String action = item.getTitle().toString();
+                if (action.equals("Reproduzir novamente")) {
+                    player.seekTo(0);
+                    player.play();
+                    refreshNowPlaying();
+                } else if (action.contains("favoritos")) {
+                    setFavorite(currentTrack, !isFavorite(currentTrack));
+                    updateMiniPlayer();
+                    refreshNowPlaying();
+                } else if (action.equals("Aleatório")) {
+                    shufflePlay();
+                    refreshNowPlaying();
+                } else {
+                    closeNowPlaying();
+                }
+                return true;
+            });
+            popup.show();
+        });
         top.addView(more, new LinearLayout.LayoutParams(dp(48), dp(48)));
         root.addView(top);
 
