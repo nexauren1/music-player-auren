@@ -77,8 +77,6 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         PlayerManager.setListener(this);
 
         // Never request audio and notification permissions at the same time.
-        // Android may keep only one permission dialog active, which previously
-        // caused the music permission flow to be skipped on some devices.
         if (hasAudioPermission()) {
             loadSongs();
             requestNotificationPermission();
@@ -280,7 +278,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         if (songs.isEmpty()) {
             addEmpty(
                     "A biblioteca está vazia",
-                    "Não encontrámos músicas neste dispositivo.",
+                    "Não encontrámos ficheiros de áudio neste dispositivo.",
                     true);
             return;
         }
@@ -636,14 +634,13 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.ALBUM,
                 MediaStore.Audio.Media.DURATION,
-                MediaStore.Audio.Media.IS_MUSIC,
                 MediaStore.Audio.Media.MIME_TYPE
         };
 
         try (Cursor cursor = getContentResolver().query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 projection,
-                MediaStore.Audio.Media.IS_MUSIC + " != 0",
+                null,
                 null,
                 MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
             if (cursor == null) {
@@ -663,7 +660,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                         String.valueOf(songId));
                 long length = cursor.getLong(duration);
-                if (length <= 0) continue;
+
                 songs.add(new PlayerManager.Song(
                         safe(cursor.getString(title), "Sem título"),
                         safe(cursor.getString(artist), "Artista desconhecido"),
@@ -672,10 +669,14 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                         uri));
             }
         } catch (SecurityException e) {
-            showLibraryError("O acesso às músicas foi recusado.");
+            showLibraryError(
+                    "O acesso às músicas foi recusado. "
+                            + "Permite o acesso e tenta novamente.");
             return;
         } catch (Exception e) {
-            showLibraryError("Não foi possível carregar as músicas.");
+            showLibraryError(
+                    "Não foi possível carregar a biblioteca: "
+                            + e.getMessage());
             return;
         }
 
