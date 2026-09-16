@@ -164,7 +164,7 @@ public class AurenHomeV2Activity extends Activity implements PlayerManager.Liste
         info.addView(nowArtist);
         mini.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
 
-        TextView expand = text("⌃", muted(), 20);
+        TextView expand = text("⌃", 20, muted());
         expand.setGravity(Gravity.CENTER);
         expand.setClickable(false);
         expand.setFocusable(false);
