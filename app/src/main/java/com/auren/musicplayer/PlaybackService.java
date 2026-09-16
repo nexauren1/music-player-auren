@@ -27,7 +27,6 @@ public class PlaybackService extends Service {
 
     private static final String CHANNEL_ID = "auren_playback";
     private static final int NOTIFICATION_ID = 1001;
-
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Bitmap cachedArtwork;
     private String cachedArtworkUri;
@@ -116,7 +115,7 @@ public class PlaybackService extends Service {
         PendingIntent next = action(ACTION_NEXT, 12);
         PendingIntent stop = action(ACTION_STOP, 13);
 
-        Intent open = new Intent(this, AurenHomeV2Activity.class);
+        Intent open = new Intent(this, AurenHomeV5Activity.class);
         open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent content = PendingIntent.getActivity(
@@ -150,10 +149,7 @@ public class PlaybackService extends Service {
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel,
                         "Parar", stop);
 
-        if (artwork != null) {
-            builder.setLargeIcon(artwork);
-        }
-
+        if (artwork != null) builder.setLargeIcon(artwork);
         if (duration > 0) {
             builder.setProgress(
                     duration,
@@ -162,7 +158,6 @@ public class PlaybackService extends Service {
         } else {
             builder.setProgress(0, 0, false);
         }
-
         return builder.build();
     }
 
@@ -186,9 +181,7 @@ public class PlaybackService extends Service {
         int seconds = totalSeconds % 60;
         return String.format(
                 java.util.Locale.getDefault(),
-                "%d:%02d",
-                minutes,
-                seconds);
+                "%d:%02d", minutes, seconds);
     }
 
     private PendingIntent action(String action, int requestCode) {
@@ -212,8 +205,7 @@ public class PlaybackService extends Service {
                 CHANNEL_ID,
                 "Reprodução de música",
                 NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription(
-                "Controles do Auren Music Player");
+        channel.setDescription("Controles do Auren Music Player");
         NotificationManager manager =
                 (NotificationManager) getSystemService(
                         NOTIFICATION_SERVICE);
