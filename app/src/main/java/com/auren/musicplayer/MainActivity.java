@@ -223,6 +223,17 @@ public class MainActivity extends ComponentActivity {
             }
         }
 
+        // AUREN_ALL_SONGS_HOME_START
+        addSectionHeader(content, "Todas as músicas", tracks.size() + " músicas", v -> showLibrary());
+        if (tracks.isEmpty()) {
+            content.addView(emptyCard("Nenhuma música encontrada no dispositivo."));
+        } else {
+            for (Track track : tracks) {
+                content.addView(trackRow(track, 0));
+            }
+        }
+        // AUREN_ALL_SONGS_HOME_END
+
         addSectionHeader(content, "Suggestions for you", "Refresh", v -> showHome());
         List<Track> suggestions = suggestionTracks();
         if (suggestions.isEmpty()) {
@@ -568,37 +579,55 @@ public class MainActivity extends ComponentActivity {
                 .setPositiveButton("Done", null)
                 .show();
     }
-
     private LinearLayout buildMiniPlayer() {
-        LinearLayout mini = rounded(0xFFFFFFFF, 20);
-        mini.setGravity(Gravity.CENTER_VERTICAL);
-        mini.setPadding(dp(8), dp(7), dp(8), dp(7));
-        mini.setElevation(dp(7));
+        LinearLayout mini = column();
+        mini.setBackgroundColor(Color.WHITE);
+        mini.setElevation(dp(8));
+        mini.setPadding(0, 0, 0, 0);
 
-        miniArt = artwork(48);
-        mini.addView(miniArt, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        View progressAccent = new View(this);
+        progressAccent.setBackgroundColor(getColor(R.color.auren_primary));
+        mini.addView(progressAccent, new LinearLayout.LayoutParams(-1, dp(3)));
+
+        LinearLayout row = row();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(8), dp(7), dp(8), dp(7));
+
+        miniArt = artwork(54);
+        miniArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        row.addView(miniArt, new LinearLayout.LayoutParams(dp(54), dp(54)));
 
         LinearLayout info = column();
         info.setGravity(Gravity.CENTER_VERTICAL);
+        info.setPadding(dp(12), 0, dp(6), 0);
         miniTitle = text("Nothing playing", 14, R.color.text_primary);
         miniTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        miniTitle.setMaxLines(1);
         miniArtist = text("Choose a song to start", 12, R.color.text_secondary);
+        miniArtist.setMaxLines(1);
         info.addView(miniTitle);
         info.addView(miniArtist, margins(0, 2, 0, 0));
-        mini.addView(info, new LinearLayout.LayoutParams(0, dp(52), 1));
+        row.addView(info, new LinearLayout.LayoutParams(0, dp(54), 1));
+
+        ImageButton miniMore = iconButton(android.R.drawable.ic_menu_more, "Player options");
+        miniMore.setOnClickListener(v -> openNowPlaying());
+        row.addView(miniMore, new LinearLayout.LayoutParams(dp(42), dp(54)));
 
         miniPlay = iconButton(android.R.drawable.ic_media_play, "Play or pause");
         miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
         DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
+        miniPlay.setPadding(dp(12), dp(12), dp(12), dp(12));
         miniPlay.setOnClickListener(v -> togglePlayback());
-        mini.addView(miniPlay, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        row.addView(miniPlay, new LinearLayout.LayoutParams(dp(54), dp(54)));
 
+        mini.addView(row);
         mini.setOnClickListener(v -> openNowPlaying());
         miniArt.setOnClickListener(v -> openNowPlaying());
         miniTitle.setOnClickListener(v -> openNowPlaying());
         miniArtist.setOnClickListener(v -> openNowPlaying());
         return mini;
     }
+
 
     private void openNowPlaying() {
         if (currentTrack == null) {
