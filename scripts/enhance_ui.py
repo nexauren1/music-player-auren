@@ -16,6 +16,16 @@ for imp in required_imports:
         anchor = "import android.app.AlertDialog;"
         text = text.replace(anchor, imp + "\n" + anchor, 1)
 
+# Repair references left by earlier UI enhancement revisions.
+text = text.replace(
+    "if (currentTrack != null) showNowPlaying();",
+    "if (currentTrack != null) openNowPlaying();",
+)
+text = text.replace(
+    "item.setBackground(roundDrawable(Color.WHITE, 16));",
+    "item.setBackgroundColor(Color.WHITE);",
+)
+
 
 def replace_method(source, method_name, replacement):
     match = re.search(
@@ -186,6 +196,12 @@ if 'private void addDrawerItem' not in text:
     updated, changed = replace_method(text, 'showAppMenu', drawer_method)
     if changed:
         text = updated
+
+# Do not allow the release pipeline to proceed with references that are
+# known not to exist in the current MainActivity API.
+for forbidden in ("showNowPlaying();", "roundDrawable("):
+    if forbidden in text:
+        raise SystemExit(f"Unresolved UI enhancement reference: {forbidden}")
 
 path.write_text(text)
 print("Auren visual enhancement completed: artwork hero + side navigation drawer.")
