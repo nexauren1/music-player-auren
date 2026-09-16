@@ -6,16 +6,16 @@ android {
     namespace 'com.auren.musicplayer'
     compileSdk 36
 
-    buildFeatures {
-        buildConfig true
-    }
-
     defaultConfig {
         applicationId 'com.auren.musicplayer'
         minSdk 23
         targetSdk 35
-        versionCode 9
-        versionName '1.7.0'
+        versionCode 10
+        versionName '1.7.1'
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     compileOptions {
