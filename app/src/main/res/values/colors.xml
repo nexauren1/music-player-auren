@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="surface">#F7F8FC</color>
+    <color name="card">#FFFFFF</color>
+    <color name="text_primary">#151821</color>
+    <color name="text_secondary">#6D7280</color>
+    <color name="line">#E7E9EF</color>
+    <color name="auren_primary">#5B5FEF</color>
+    <color name="auren_secondary">#8B7CFF</color>
+    <color name="accent_soft">#ECECFF</color>
+</resources>
