@@ -3,6 +3,7 @@ package com.auren.musicplayer;
 import android.Manifest;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.content.ContentUris;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -39,11 +40,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * Auren V5 - Professional Music Player home.
- * The screen is intentionally built in Java so the visual system is easy
- * to evolve without a large XML layout tree.
- */
 public class AurenHomeV5Activity extends Activity
         implements PlayerManager.Listener {
 
@@ -67,7 +63,6 @@ public class AurenHomeV5Activity extends Activity
     private TextView miniArtist;
     private TextView miniPlay;
     private EditText search;
-    private TextView count;
     private ObjectAnimator artworkRotation;
     private String section = "Músicas";
     private android.content.SharedPreferences prefs;
@@ -79,26 +74,21 @@ public class AurenHomeV5Activity extends Activity
         configureBars();
         buildInterface();
         PlayerManager.setListener(this);
-        if (hasAudioPermission()) {
-            loadLibrary();
-        } else {
-            showPermissionState();
-            requestAudioPermission();
-        }
+        loadLibrary();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         updateMiniPlayer();
-        if (hasAudioPermission() && songs.isEmpty()) loadLibrary();
+        if (hasAudioPermission()) loadLibrary();
     }
 
     @Override
     protected void onDestroy() {
         PlayerManager.setListener(null);
-        executor.shutdownNow();
         stopArtworkAnimation();
+        executor.shutdownNow();
         super.onDestroy();
     }
 
@@ -179,7 +169,6 @@ public class AurenHomeV5Activity extends Activity
         search.setTextColor(TEXT);
         search.setHintTextColor(MUTED);
         search.setBackgroundColor(Color.TRANSPARENT);
-        search.setPadding(dp(5), 0, 0, 0);
         searchBox.addView(search, weight(1, 50));
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
@@ -194,24 +183,7 @@ public class AurenHomeV5Activity extends Activity
     private LinearLayout buildNavigation() {
         LinearLayout nav = row(Color.WHITE);
         nav.setPadding(dp(12), dp(7), dp(12), dp(7));
-        String[] tabs = {"Músicas", "Favoritos", "Recentes"};
-        for (String tabName : tabs) {
-            TextView tab = label(tabName, 12,
-                    tabName.equals(section) ? Color.WHITE : TEXT);
-            tab.setGravity(Gravity.CENTER);
-            tab.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            tab.setBackground(round(
-                    tabName.equals(section) ? GREEN : Color.WHITE, 16));
-            LinearLayout.LayoutParams p = weight(1, 44);
-            p.leftMargin = dp(3);
-            p.rightMargin = dp(3);
-            nav.addView(tab, p);
-            tab.setOnClickListener(v -> {
-                section = tabName;
-                rebuildNavigation(nav);
-                render();
-            });
-        }
+        rebuildNavigation(nav);
         return nav;
     }
 
@@ -241,19 +213,19 @@ public class AurenHomeV5Activity extends Activity
         if (content == null) return;
         content.removeAllViews();
         visible.clear();
-        String query = search == null ? "" : search.getText().toString()
-                .trim().toLowerCase(Locale.getDefault());
 
+        String q = search == null ? "" : search.getText().toString()
+                .trim().toLowerCase(Locale.getDefault());
         Set<String> favorites = favorites();
-        List<String> recent = recent();
+
         if (section.equals("Recentes")) {
-            for (String uri : recent) {
+            for (String uri : recent()) {
                 PlayerManager.Song song = findSong(uri);
-                if (song != null && matches(song, query)) visible.add(song);
+                if (song != null && matches(song, q)) visible.add(song);
             }
         } else {
             for (PlayerManager.Song song : songs) {
-                if (!matches(song, query)) continue;
+                if (!matches(song, q)) continue;
                 if (section.equals("Favoritos")
                         && !favorites.contains(song.uri.toString())) continue;
                 visible.add(song);
@@ -264,7 +236,7 @@ public class AurenHomeV5Activity extends Activity
         TextView title = label(section, 23, TEXT);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         heading.addView(title, weight(1, 40));
-        count = label(visible.size() + " faixas", 12, MUTED);
+        TextView count = label(visible.size() + " faixas", 12, MUTED);
         count.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
         heading.addView(count, size(90, 40));
         content.addView(heading);
@@ -274,16 +246,13 @@ public class AurenHomeV5Activity extends Activity
             return;
         }
         if (songs.isEmpty()) {
-            showEmpty("A biblioteca está vazia",
-                    "Coloca música no dispositivo e atualiza a biblioteca.", true);
+            showEmpty("Nenhuma música encontrada",
+                    "O Auren não encontrou áudio no armazenamento.", true);
             return;
         }
         if (visible.isEmpty()) {
-            showEmpty(section.equals("Recentes")
-                            ? "Ainda não há músicas recentes"
-                            : "Nada encontrado",
-                    "Experimenta outra pesquisa ou explora a tua biblioteca.",
-                    false);
+            showEmpty("Nada encontrado",
+                    "Experimenta outra pesquisa ou outra secção.", false);
             return;
         }
         for (PlayerManager.Song song : visible) {
@@ -399,11 +368,10 @@ public class AurenHomeV5Activity extends Activity
     }
 
     private void stopArtworkAnimation() {
-        if (artworkRotation != null) {
-            artworkRotation.cancel();
-            artworkRotation = null;
-            if (miniArtwork != null) miniArtwork.setRotation(0f);
-        }
+        if (artworkRotation == null) return;
+        artworkRotation.cancel();
+        artworkRotation = null;
+        if (miniArtwork != null) miniArtwork.setRotation(0f);
     }
 
     private void play(PlayerManager.Song song) {
@@ -435,9 +403,11 @@ public class AurenHomeV5Activity extends Activity
 
     private void loadLibrary() {
         if (!hasAudioPermission()) {
+            showPermissionState();
             requestAudioPermission();
             return;
         }
+
         content.removeAllViews();
         TextView loading = label("A procurar a tua música…", 15, MUTED);
         loading.setGravity(Gravity.CENTER);
@@ -446,6 +416,7 @@ public class AurenHomeV5Activity extends Activity
         executor.execute(() -> {
             List<PlayerManager.Song> found = queryAudio();
             runOnUiThread(() -> {
+                if (isFinishing()) return;
                 songs.clear();
                 songs.addAll(found);
                 PlayerManager.setQueue(songs.toArray(
@@ -457,39 +428,111 @@ public class AurenHomeV5Activity extends Activity
 
     private List<PlayerManager.Song> queryAudio() {
         List<PlayerManager.Song> result = new ArrayList<>();
+        Uri audioUri = Build.VERSION.SDK_INT >= 29
+                ? MediaStore.Audio.Media.getContentUri(
+                        MediaStore.VOLUME_EXTERNAL)
+                : MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+
         String[] projection = {
                 MediaStore.Audio.Media._ID,
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.ALBUM,
                 MediaStore.Audio.Media.DURATION,
-                MediaStore.Audio.Media.IS_MUSIC
+                MediaStore.Audio.Media.DISPLAY_NAME,
+                MediaStore.Audio.Media.MIME_TYPE
         };
-        String selection = MediaStore.Audio.Media.IS_MUSIC + " != 0";
-        String sort = MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC";
+
         try (Cursor cursor = getContentResolver().query(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection, selection, null, sort)) {
-            if (cursor == null) return result;
-            int id = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID);
-            int title = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE);
-            int artist = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST);
-            int album = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM);
-            int duration = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION);
-            while (cursor.moveToNext()) {
-                long mediaId = cursor.getLong(id);
-                Uri uri = Uri.withAppendedPath(
-                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                        String.valueOf(mediaId));
-                result.add(new PlayerManager.Song(
-                        safe(cursor.getString(title), "Sem título"),
-                        safe(cursor.getString(artist), "Artista desconhecido"),
-                        safe(cursor.getString(album), "Álbum desconhecido"),
-                        cursor.getLong(duration), uri));
+                audioUri, projection, null, null,
+                MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
+            if (cursor != null) {
+                readAudioCursor(cursor, audioUri, result);
             }
         } catch (Exception ignored) {
         }
+
+        if (result.isEmpty()) {
+            queryFilesFallback(result);
+        }
         return result;
+    }
+
+    private void readAudioCursor(Cursor cursor, Uri baseUri,
+            List<PlayerManager.Song> result) {
+        int id = cursor.getColumnIndex(MediaStore.Audio.Media._ID);
+        int title = cursor.getColumnIndex(MediaStore.Audio.Media.TITLE);
+        int artist = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST);
+        int album = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM);
+        int duration = cursor.getColumnIndex(MediaStore.Audio.Media.DURATION);
+        int display = cursor.getColumnIndex(
+                MediaStore.Audio.Media.DISPLAY_NAME);
+
+        if (id < 0) return;
+        while (cursor.moveToNext()) {
+            long mediaId = cursor.getLong(id);
+            Uri uri = ContentUris.withAppendedId(baseUri, mediaId);
+            String name = display >= 0 ? cursor.getString(display) : null;
+            String songTitle = title >= 0 ? cursor.getString(title) : null;
+            String songArtist = artist >= 0 ? cursor.getString(artist) : null;
+            String songAlbum = album >= 0 ? cursor.getString(album) : null;
+            long songDuration = duration >= 0 ? cursor.getLong(duration) : 0;
+
+            result.add(new PlayerManager.Song(
+                    safe(songTitle, safe(name, "Sem título")),
+                    safe(songArtist, "Artista desconhecido"),
+                    safe(songAlbum, "Álbum desconhecido"),
+                    songDuration, uri));
+        }
+    }
+
+    private void queryFilesFallback(List<PlayerManager.Song> result) {
+        Uri filesUri = MediaStore.Files.getContentUri("external");
+        String[] projection = {
+                MediaStore.Files.FileColumns._ID,
+                MediaStore.Files.FileColumns.DISPLAY_NAME,
+                MediaStore.Files.FileColumns.MIME_TYPE,
+                MediaStore.Files.FileColumns.MEDIA_TYPE,
+                MediaStore.Files.FileColumns.DURATION
+        };
+        String selection = MediaStore.Files.FileColumns.MEDIA_TYPE
+                + " = ?";
+        String[] args = {
+                String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO)
+        };
+
+        try (Cursor cursor = getContentResolver().query(
+                filesUri, projection, selection, args,
+                MediaStore.Files.FileColumns.DISPLAY_NAME
+                        + " COLLATE NOCASE ASC")) {
+            if (cursor == null) return;
+            int id = cursor.getColumnIndex(
+                    MediaStore.Files.FileColumns._ID);
+            int name = cursor.getColumnIndex(
+                    MediaStore.Files.FileColumns.DISPLAY_NAME);
+            int duration = cursor.getColumnIndex(
+                    MediaStore.Files.FileColumns.DURATION);
+            if (id < 0) return;
+
+            while (cursor.moveToNext()) {
+                long mediaId = cursor.getLong(id);
+                String fileName = name >= 0
+                        ? cursor.getString(name) : "Sem título";
+                long length = duration >= 0 ? cursor.getLong(duration) : 0;
+                Uri uri = ContentUris.withAppendedId(filesUri, mediaId);
+                result.add(new PlayerManager.Song(
+                        removeExtension(safe(fileName, "Sem título")),
+                        "Artista desconhecido",
+                        "Álbum desconhecido",
+                        length, uri));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String removeExtension(String value) {
+        int dot = value.lastIndexOf('.');
+        return dot > 0 ? value.substring(0, dot) : value;
     }
 
     private void showPermissionState() {
@@ -498,22 +541,24 @@ public class AurenHomeV5Activity extends Activity
     }
 
     private void showPermissionCard() {
-        LinearLayout card = row(Color.WHITE);
+        LinearLayout card = column(Color.WHITE);
         card.setGravity(Gravity.CENTER);
         card.setPadding(dp(22), dp(20), dp(22), dp(20));
-        card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(round(Color.WHITE, 22));
-        TextView icon = icon("♫", GREEN, 38);
-        card.addView(icon, size(-1, 50));
+
+        TextView music = icon("♫", GREEN, 38);
+        card.addView(music, size(-1, 50));
         TextView title = label("A tua música está aqui", 19, TEXT);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         card.addView(title, size(-1, 32));
+
         TextView message = label(
-                "Permite acesso ao áudio para o Auren construir a biblioteca.",
+                "Permite acesso ao áudio para o Auren ler a biblioteca.",
                 13, MUTED);
         message.setGravity(Gravity.CENTER);
         card.addView(message, size(-1, 48));
+
         TextView button = label("Permitir acesso", 13, Color.WHITE);
         button.setGravity(Gravity.CENTER);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -523,20 +568,22 @@ public class AurenHomeV5Activity extends Activity
         content.addView(card, size(-1, 215));
     }
 
-    private void showEmpty(String titleText, String message, boolean refresh) {
+    private void showEmpty(String title, String message, boolean refresh) {
         LinearLayout box = column(Color.WHITE);
         box.setGravity(Gravity.CENTER);
         box.setPadding(dp(22), dp(22), dp(22), dp(22));
         box.setBackground(round(Color.WHITE, 22));
-        TextView icon = icon("♫", GREEN, 34);
-        box.addView(icon, size(-1, 48));
-        TextView title = label(titleText, 18, TEXT);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        box.addView(title, size(-1, 32));
+
+        TextView music = icon("♫", GREEN, 34);
+        box.addView(music, size(-1, 48));
+        TextView heading = label(title, 18, TEXT);
+        heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        heading.setGravity(Gravity.CENTER);
+        box.addView(heading, size(-1, 32));
         TextView msg = label(message, 13, MUTED);
         msg.setGravity(Gravity.CENTER);
         box.addView(msg, size(-1, 48));
+
         if (refresh) {
             TextView button = label("Atualizar biblioteca", 13, Color.WHITE);
             button.setGravity(Gravity.CENTER);
@@ -549,11 +596,14 @@ public class AurenHomeV5Activity extends Activity
     }
 
     private void requestAudioPermission() {
+        if (Build.VERSION.SDK_INT < 23) {
+            loadLibrary();
+            return;
+        }
         String permission = Build.VERSION.SDK_INT >= 33
                 ? Manifest.permission.READ_MEDIA_AUDIO
                 : Manifest.permission.READ_EXTERNAL_STORAGE;
-        if (Build.VERSION.SDK_INT >= 23
-                && checkSelfPermission(permission)
+        if (checkSelfPermission(permission)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{permission}, REQUEST_AUDIO);
         } else {
@@ -561,22 +611,25 @@ public class AurenHomeV5Activity extends Activity
         }
     }
 
-    @Override
-    public void onRequestPermissionsResult(int code,
-            String[] permissions, int[] results) {
-        super.onRequestPermissionsResult(code, permissions, results);
-        if (code == REQUEST_AUDIO) {
-            if (hasAudioPermission()) loadLibrary();
-            else showPermissionState();
-        }
-    }
-
     private boolean hasAudioPermission() {
+        if (Build.VERSION.SDK_INT < 23) return true;
         String permission = Build.VERSION.SDK_INT >= 33
                 ? Manifest.permission.READ_MEDIA_AUDIO
                 : Manifest.permission.READ_EXTERNAL_STORAGE;
-        return Build.VERSION.SDK_INT < 23
-                || checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+        return checkSelfPermission(permission)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+            String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != REQUEST_AUDIO) return;
+        if (hasAudioPermission()) {
+            loadLibrary();
+        } else {
+            showPermissionState();
+        }
     }
 
     private void loadArtwork(PlayerManager.Song song, ImageView view) {
@@ -594,7 +647,8 @@ public class AurenHomeV5Activity extends Activity
             artwork.put(key, bitmap);
             runOnUiThread(() -> {
                 if (!isFinishing()
-                        && (view == miniArtwork || key.equals(view.getTag()))) {
+                        && (view == miniArtwork
+                        || key.equals(view.getTag()))) {
                     view.setImageBitmap(bitmap);
                     view.clearColorFilter();
                 }
@@ -615,7 +669,10 @@ public class AurenHomeV5Activity extends Activity
         } catch (Exception ignored) {
             return null;
         } finally {
-            try { retriever.release(); } catch (Exception ignored) {}
+            try {
+                retriever.release();
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -645,7 +702,9 @@ public class AurenHomeV5Activity extends Activity
         String raw = prefs.getString("recent_history", "");
         if (raw.isEmpty()) return result;
         for (String value : raw.split("\\|")) {
-            if (!value.isEmpty() && !result.contains(value)) result.add(value);
+            if (!value.isEmpty() && !result.contains(value)) {
+                result.add(value);
+            }
         }
         return result;
     }
@@ -729,6 +788,7 @@ public class AurenHomeV5Activity extends Activity
     }
 
     private String safe(String value, String fallback) {
-        return value == null || value.trim().isEmpty() ? fallback : value;
+        return value == null || value.trim().isEmpty()
+                ? fallback : value;
     }
 }
