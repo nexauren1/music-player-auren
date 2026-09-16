@@ -50,7 +50,6 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     private static final int CARD = Color.WHITE;
     private static final int TEXT = Color.rgb(24, 30, 26);
     private static final int MUTED = Color.rgb(101, 111, 105);
-    private static final int BORDER = Color.rgb(226, 232, 228);
 
     private final List<PlayerManager.Song> songs = new ArrayList<>();
     private final List<PlayerManager.Song> visible = new ArrayList<>();
@@ -76,8 +75,16 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         styleSystemBars();
         buildUi();
         PlayerManager.setListener(this);
-        requestAudioPermission();
-        requestNotificationPermission();
+
+        // Never request audio and notification permissions at the same time.
+        // Android may keep only one permission dialog active, which previously
+        // caused the music permission flow to be skipped on some devices.
+        if (hasAudioPermission()) {
+            loadSongs();
+            requestNotificationPermission();
+        } else {
+            requestAudioPermission();
+        }
     }
 
     @Override
@@ -120,7 +127,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         brandBox.setGravity(Gravity.CENTER_VERTICAL);
         TextView brand = text("AUREN", 21, Color.WHITE);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView brandSub = text("MUSIC PLAYER", 9, Color.rgb(211, 239, 219));
+        TextView brandSub = text("MUSIC PLAYER", 9,
+                Color.rgb(211, 239, 219));
         brandSub.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         brandBox.addView(brand);
         brandBox.addView(brandSub);
@@ -162,16 +170,19 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         search.setPadding(dp(5), 0, dp(8), 0);
         searchBox.addView(search, weight(1, 50));
         search.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(
-                    CharSequence s, int st, int c, int a) {
+            @Override
+            public void beforeTextChanged(CharSequence s, int st,
+                                          int c, int a) {
             }
 
-            @Override public void onTextChanged(
-                    CharSequence s, int st, int before, int count) {
+            @Override
+            public void onTextChanged(CharSequence s, int st,
+                                      int before, int count) {
                 renderLibrary();
             }
 
-            @Override public void afterTextChanged(Editable e) {
+            @Override
+            public void afterTextChanged(Editable e) {
             }
         });
 
@@ -254,7 +265,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         headingRow.addView(title, weight(1, 34));
 
         libraryStatus = text(
-                visible.size() + (visible.size() == 1 ? " música" : " músicas"),
+                visible.size() + (visible.size() == 1
+                        ? " música" : " músicas"),
                 12, MUTED);
         libraryStatus.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
         headingRow.addView(libraryStatus, size(110, 34));
@@ -304,7 +316,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         card.addView(title, size(-1, 30));
 
         TextView message = text(
-                "O Auren precisa de permissão para mostrar as músicas guardadas no telemóvel.",
+                "O Auren precisa de permissão para mostrar as músicas "
+                        + "guardadas no telemóvel.",
                 13, MUTED);
         message.setGravity(Gravity.CENTER);
         message.setPadding(0, dp(4), 0, dp(14));
@@ -470,7 +483,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
 
     private void openPlayer() {
         if (PlayerManager.getCurrentSong() == null) {
-            Toast.makeText(this, "Escolhe uma música primeiro.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Escolhe uma música primeiro.",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
         startActivity(new Intent(this, PlayerActivity.class));
@@ -496,9 +510,12 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         menu.addView(sub, size(-1, 26));
 
         addMenuItem(menu, "▶", "Player", "Abrir o leitor", this::openPlayer);
-        addMenuItem(menu, "♫", "Efeitos de áudio", "Equalizador e graves", this::openEffects);
-        addMenuItem(menu, "⚙", "Definições", "Aparência, biblioteca e atualizações", this::openSettings);
-        addMenuItem(menu, "↻", "Atualizar biblioteca", "Procurar músicas novamente", this::loadSongs);
+        addMenuItem(menu, "♫", "Efeitos de áudio",
+                "Equalizador e graves", this::openEffects);
+        addMenuItem(menu, "⚙", "Definições",
+                "Aparência, biblioteca e atualizações", this::openSettings);
+        addMenuItem(menu, "↻", "Atualizar biblioteca",
+                "Procurar músicas novamente", this::loadSongs);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(menu)
@@ -688,6 +705,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
             requestPermissions(new String[]{permission}, REQUEST_AUDIO);
         } else {
             loadSongs();
+            requestNotificationPermission();
         }
     }
 
@@ -706,8 +724,12 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
             int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQUEST_AUDIO) {
-            if (hasAudioPermission()) loadSongs();
-            else renderLibrary();
+            if (hasAudioPermission()) {
+                loadSongs();
+                requestNotificationPermission();
+            } else {
+                renderLibrary();
+            }
         }
     }
 
@@ -761,7 +783,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
 
     @Override
     public void onPlayerError(String message) {
-        runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+        runOnUiThread(() -> Toast.makeText(this, message,
+                Toast.LENGTH_LONG).show());
     }
 
     private LinearLayout row(int color) {
@@ -804,7 +827,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 0, height < 0 ? height : dp(height), weight);
     }
 
-    private android.graphics.drawable.GradientDrawable round(int color, int radius) {
+    private android.graphics.drawable.GradientDrawable round(int color,
+                                                               int radius) {
         android.graphics.drawable.GradientDrawable drawable =
                 new android.graphics.drawable.GradientDrawable();
         drawable.setColor(color);
