@@ -13,6 +13,10 @@ env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,7 +38,12 @@ jobs:
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Check Gradle
+        run: gradle --version
 
       - name: Prepare release keystore
         env:
@@ -50,7 +59,7 @@ jobs:
           AUREN_KEY_ALIAS: ${{ secrets.AUREN_KEY_ALIAS }}
           AUREN_KEY_PASS: ${{ secrets.AUREN_KEY_PASS }}
           AUREN_STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
-        run: gradle --no-daemon clean assembleRelease
+        run: gradle --no-daemon clean assembleRelease --stacktrace
 
       - name: Verify APK
         run: |
