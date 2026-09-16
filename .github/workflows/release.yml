@@ -34,14 +34,14 @@ jobs:
       - name: Prepare release signing
         shell: bash
         env:
-          KEYSTORE_B64: ${{ secrets.AUREN_KEYSTORE_B64 }}
+          KEYSTORE_HEX: ${{ secrets.AUREN_KEYSTORE_B64 }}
           STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
           KEY_ALIAS: ${{ secrets.AUREN_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.AUREN_KEY_PASS }}
         run: |
           set -e
 
-          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASS" ] \
+          if [ -z "$KEYSTORE_HEX" ] || [ -z "$STORE_PASS" ] \
             || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASS" ]; then
             echo "Missing release signing secrets."
             exit 1
@@ -49,9 +49,23 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/auren-signing"
 
-          printf '%s' "$KEYSTORE_B64" \
-            | tr -d '[:space:]' \
-            | base64 --decode --ignore-garbage \
+          KEYSTORE_HEX=$(printf '%s' "$KEYSTORE_HEX" \
+            | tr -d '[:space:]')
+
+          if ! printf '%s' "$KEYSTORE_HEX" \
+            | grep -Eq '^[0-9A-Fa-f]+$'; then
+            echo "AUREN_KEYSTORE_B64 does not contain valid keystore data."
+            echo "Replace it with the HEX value from AUREN_KEYSTORE_HEX.txt."
+            exit 1
+          fi
+
+          if [ $(( ${#KEYSTORE_HEX} % 2 )) -ne 0 ]; then
+            echo "Invalid HEX length for keystore."
+            exit 1
+          fi
+
+          printf '%s' "$KEYSTORE_HEX" \
+            | xxd -r -p \
             > "$RUNNER_TEMP/auren-signing/auren-release.keystore"
 
           test -s "$RUNNER_TEMP/auren-signing/auren-release.keystore"
