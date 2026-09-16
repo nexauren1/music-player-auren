@@ -7,7 +7,6 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
-import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
 
 public final class PlayerManager {
@@ -19,7 +18,6 @@ public final class PlayerManager {
     }
 
     private static MediaPlayer player;
-    private static ParcelFileDescriptor sourceFd;
     private static Song currentSong;
     private static Song[] queue = new Song[0];
     private static Listener listener;
@@ -108,7 +106,10 @@ public final class PlayerManager {
                     PowerManager.PARTIAL_WAKE_LOCK);
             newPlayer.setVolume(1.0f, 1.0f);
 
-            setDataSourceFromUri(newPlayer, song.uri);
+            // MediaStore gives us a content:// URI. Let MediaPlayer
+            // open it through ContentResolver instead of passing a
+            // temporary file descriptor to an asynchronous player.
+            newPlayer.setDataSource(appContext, song.uri);
 
             newPlayer.setOnPreparedListener(mp -> {
                 if (mp != player) {
@@ -151,21 +152,6 @@ public final class PlayerManager {
             failPlayback(
                     "Não foi possível abrir este ficheiro de áudio.");
         }
-    }
-
-    private static void setDataSourceFromUri(
-            MediaPlayer mediaPlayer,
-            Uri uri) throws Exception {
-        closeSourceFd();
-        sourceFd = appContext.getContentResolver()
-                .openFileDescriptor(uri, "r");
-
-        if (sourceFd == null) {
-            throw new IllegalStateException(
-                    "Ficheiro de áudio indisponível");
-        }
-
-        mediaPlayer.setDataSource(sourceFd.getFileDescriptor());
     }
 
     private static void configureAudio(MediaPlayer mediaPlayer) {
@@ -320,18 +306,6 @@ public final class PlayerManager {
                 old.release();
             } catch (Exception ignored) {
             }
-        }
-
-        closeSourceFd();
-    }
-
-    private static void closeSourceFd() {
-        if (sourceFd != null) {
-            try {
-                sourceFd.close();
-            } catch (Exception ignored) {
-            }
-            sourceFd = null;
         }
     }
 
