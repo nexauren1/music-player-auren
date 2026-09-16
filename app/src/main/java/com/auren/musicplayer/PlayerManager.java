@@ -45,7 +45,7 @@ public final class PlayerManager {
 
     public static void setListener(Listener value) {
         listener = value;
-        notifyChanged();
+        notifyUiChanged();
     }
 
     public static Song getCurrentSong() {
@@ -110,7 +110,7 @@ public final class PlayerManager {
 
     public static void setQueue(Song[] songs) {
         queue = songs == null ? new Song[0] : songs.clone();
-        notifyChanged();
+        notifyUiChanged();
     }
 
     public static void play(Context context, Song song) {
@@ -124,7 +124,7 @@ public final class PlayerManager {
         preparing = true;
         ensurePlayer();
         startPlaybackService();
-        notifyChanged();
+        notifyUiChanged();
 
         try {
             List<MediaItem> items = buildMediaItems(queue);
@@ -173,7 +173,6 @@ public final class PlayerManager {
         player = new ExoPlayer.Builder(appContext).build();
         player.setRepeatMode(Player.REPEAT_MODE_OFF);
         player.setShuffleModeEnabled(shuffle);
-        setupEffects();
 
         player.addListener(new Player.Listener() {
             @Override
@@ -181,20 +180,24 @@ public final class PlayerManager {
                 preparing = state == Player.STATE_BUFFERING;
                 if (state == Player.STATE_READY) {
                     preparing = false;
-                    notifyChanged();
+                    setupEffects();
+                    notifyUiChanged();
                 }
             }
 
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
-                if (isPlaying) preparing = false;
-                notifyChanged();
+                if (isPlaying) {
+                    preparing = false;
+                    setupEffects();
+                }
+                notifyUiChanged();
             }
 
             @Override
             public void onMediaItemTransition(MediaItem item, int reason) {
                 updateCurrentSongFromIndex();
-                notifyChanged();
+                notifyUiChanged();
             }
 
             @Override
@@ -202,7 +205,7 @@ public final class PlayerManager {
                 preparing = false;
                 notifyError("Não foi possível reproduzir esta música. "
                         + "Erro " + error.errorCode + ".");
-                notifyChanged();
+                notifyUiChanged();
             }
         });
     }
@@ -230,7 +233,7 @@ public final class PlayerManager {
         } else {
             player.play();
         }
-        notifyChanged();
+        notifyUiChanged();
     }
 
     public static void seekTo(int position) {
@@ -287,7 +290,7 @@ public final class PlayerManager {
     public static void setShuffle(boolean value) {
         shuffle = value;
         if (player != null) player.setShuffleModeEnabled(value);
-        notifyChanged();
+        notifyUiChanged();
     }
 
     public static void setRepeat(boolean value) {
@@ -297,7 +300,7 @@ public final class PlayerManager {
                     ? Player.REPEAT_MODE_ONE
                     : Player.REPEAT_MODE_OFF);
         }
-        notifyChanged();
+        notifyUiChanged();
     }
 
     public static boolean isEqualizerEnabled() {
@@ -316,7 +319,7 @@ public final class PlayerManager {
             } catch (Exception ignored) {
             }
         }
-        notifyChanged();
+        notifyUiChanged();
     }
 
     public static void setBassBoostEnabled(boolean enabled) {
@@ -327,7 +330,7 @@ public final class PlayerManager {
             } catch (Exception ignored) {
             }
         }
-        notifyChanged();
+        notifyUiChanged();
     }
 
     public static boolean applyEqualizerPreset(String preset) {
@@ -344,6 +347,7 @@ public final class PlayerManager {
             } else {
                 values = new short[]{0, 0, 0, 0, 0};
             }
+
             short min = equalizer.getBandLevelRange()[0];
             short max = equalizer.getBandLevelRange()[1];
             short count = equalizer.getNumberOfBands();
@@ -353,7 +357,7 @@ public final class PlayerManager {
                 equalizer.setBandLevel(i, value);
             }
             equalizer.setEnabled(true);
-            notifyChanged();
+            notifyUiChanged();
             return true;
         } catch (Exception ignored) {
             return false;
@@ -393,7 +397,7 @@ public final class PlayerManager {
             player.release();
             player = null;
         }
-        notifyChanged();
+        notifyUiChanged();
     }
 
     private static void failPlayback(String message) {
@@ -405,7 +409,7 @@ public final class PlayerManager {
             }
         }
         notifyError(message);
-        notifyChanged();
+        notifyUiChanged();
     }
 
     private static void notifyError(String message) {
@@ -425,19 +429,8 @@ public final class PlayerManager {
         }
     }
 
-    private static void notifyChanged() {
+    private static void notifyUiChanged() {
         if (listener != null) listener.onPlayerChanged();
-        if (appContext == null) return;
-        Intent intent = new Intent(appContext, PlaybackService.class);
-        intent.setAction(PlaybackService.ACTION_UPDATE);
-        try {
-            if (Build.VERSION.SDK_INT >= 26) {
-                appContext.startForegroundService(intent);
-            } else {
-                appContext.startService(intent);
-            }
-        } catch (Exception ignored) {
-        }
     }
 
     private static int indexOf(Song[] songs, Song song) {
