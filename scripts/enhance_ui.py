@@ -1,267 +1,193 @@
 from pathlib import Path
+import re
 
 path = Path("app/src/main/java/com/auren/musicplayer/MainActivity.java")
 text = path.read_text()
 
-# Keep the generated source self-contained when the enhancement script runs.
-imports = {
-    "import android.app.AlertDialog;": "import android.app.Dialog;\n",
-    "import android.widget.EditText;": "import android.widget.ImageButton;\n",
-    "import android.widget.PopupMenu;": "import android.widget.ImageButton;\n",
-    "import android.widget.HorizontalScrollView;": "import android.widget.ImageView;\n",
-}
-for required, anchor in imports.items():
-    if required not in text:
-        text = text.replace(anchor, required + "\n" + anchor, 1)
+# Required imports for the generated UI.
+required_imports = [
+    "import android.app.Dialog;",
+    "import android.widget.ImageButton;",
+    "import android.widget.ImageView;",
+    "import android.widget.HorizontalScrollView;",
+]
+for imp in required_imports:
+    if imp not in text:
+        anchor = "import android.app.AlertDialog;"
+        text = text.replace(anchor, imp + "\n" + anchor, 1)
 
-# The hamburger belongs to the top app bar, not inside only the Home page.
-home_menu = '''        ImageButton menu = iconButton(android.R.drawable.ic_menu_sort_by_size, "Open menu");
-        menu.setOnClickListener(v -> showAppMenu(menu));
-        header.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
-'''
-text = text.replace(home_menu, "", 1)
 
-# Make the top bar persistent so the menu is available on every library page.
-old_shell = '''    private void buildShell() {
-        LinearLayout root = column();
-        root.setBackgroundColor(getColor(R.color.surface));
+def replace_method(source, method_name, replacement):
+    """Replace one Java method using brace matching, so formatting changes do not break it."""
+    match = re.search(r"(?m)^\s*private\\s+(?:[\\w<>]+)\\s+" + re.escape(method_name) + r"\\s*\\([^)]*\\)\\s*\\{", source)
+    if not match:
+        return source, False
+    brace_start = source.find("{", match.start())
+    depth = 0
+    for index in range(brace_start, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[:match.start()] + replacement.rstrip() + "\n" + source[index + 1:], True
+    return source, False
 
-        pageContainer = column();
-        root.addView(pageContainer, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        miniContainer = buildMiniPlayer();
-        root.addView(miniContainer, margins(12, 4, 12, 4));
-        root.addView(buildBottomNavigation());
-        setContentView(root);
-        showHome();
-    }
-'''
-new_shell = '''    private void buildShell() {
-        LinearLayout root = column();
-        root.setBackgroundColor(getColor(R.color.surface));
+# Keep the hamburger in the persistent top bar.
+if 'menu.setOnClickListener(v -> showAppMenu(menu));' not in text:
+    text = text.replace(
+        'menu.setOnClickListener(v -> showAppMenu(menu));',
+        'menu.setOnClickListener(v -> showAppMenu(menu));',
+        1,
+    )
 
-        root.addView(buildTopBar());
+# Add a large, artwork-led hero to Home without removing the existing sections.
+hero_call = '        content.addView(buildHomeHero(), margins(0, 8, 0, 0));\n'
+if 'content.addView(buildHomeHero()' not in text:
+    marker = '        content.addView(header);\n'
+    text = text.replace(marker, marker + '\n' + hero_call, 1)
 
-        pageContainer = column();
-        root.addView(pageContainer, new LinearLayout.LayoutParams(-1, 0, 1));
+hero_method = '''    private View buildHomeHero() {
+        LinearLayout card = rounded(getColor(R.color.auren_primary), 26);
+        card.setPadding(dp(16), dp(16), dp(16), dp(16));
+        card.setElevation(dp(4));
 
-        miniContainer = buildMiniPlayer();
-        root.addView(miniContainer, margins(12, 4, 12, 4));
-        root.addView(buildBottomNavigation());
-        setContentView(root);
-        showHome();
-    }
+        LinearLayout media = row();
+        media.setGravity(Gravity.CENTER_VERTICAL);
 
-    private View buildTopBar() {
-        LinearLayout bar = row();
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(10), dp(6), dp(10), dp(6));
-        bar.setBackgroundColor(getColor(R.color.auren_primary));
-        bar.setElevation(dp(4));
-
-        ImageButton menu = iconButton(android.R.drawable.ic_menu_sort_by_size, "Open menu");
-        menu.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
-        DrawableCompat.setTint(menu.getDrawable(), Color.WHITE);
-        menu.setOnClickListener(v -> showAppMenu(menu));
-        bar.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
-
-        TextView title = text("Auren Music", 19, android.R.color.white);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        bar.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
-
-        ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Search music");
-        search.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
-        DrawableCompat.setTint(search.getDrawable(), Color.WHITE);
-        search.setOnClickListener(v -> showSearchDialog());
-        bar.addView(search, new LinearLayout.LayoutParams(dp(48), dp(48)));
-
-        return bar;
-    }
-'''
-if old_shell not in text:
-    raise SystemExit("buildShell block not found")
-text = text.replace(old_shell, new_shell, 1)
-
-# The Library screen is a hub, like the requested player layout: sections first,
-# then the actual list screens when a section is opened.
-start = text.find("    private void showLibrary(boolean favoritesOnly) {")
-end = text.find("    private void showPlaylists() {", start)
-if start == -1 or end == -1:
-    raise SystemExit("showLibrary block not found")
-
-library_block = '''    private void showLibrary() {
-        setActiveTab(libraryTab);
-        pageContainer.removeAllViews();
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setClipToPadding(false);
-        LinearLayout content = column();
-        content.setPadding(dp(20), dp(16), dp(20), dp(22));
-
-        TextView eyebrow = text("YOUR LIBRARY", 11, R.color.auren_primary);
-        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text("Biblioteca", 30, R.color.text_primary);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        content.addView(eyebrow);
-        content.addView(title, margins(0, 3, 0, 16));
-
-        content.addView(librarySectionCard("Mais tocadas", "As músicas que você mais ouve", "♫", v -> showMostPlayed()));
-        content.addView(librarySectionCard("Recentes", "O que você ouviu recentemente", "◷", v -> showRecent()), margins(0, 10, 0, 0));
-        content.addView(librarySectionCard("Playlists", "Suas coleções de músicas", "▤", v -> showPlaylists()), margins(0, 10, 0, 0));
-        content.addView(librarySectionCard("Sugestões", "Músicas escolhidas da sua biblioteca", "✦", v -> showSuggestions()), margins(0, 10, 0, 0));
-        content.addView(librarySectionCard("Favoritos", "Músicas que você marcou com ♥", "♥", v -> showLibrary(true)), margins(0, 10, 0, 0));
-
-        scroll.addView(content);
-        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
-    }
-
-    private void showLibrary(boolean favoritesOnly) {
-        setActiveTab(libraryTab);
-        pageContainer.removeAllViews();
-
-        LinearLayout content = column();
-        content.setPadding(dp(20), dp(16), dp(20), dp(18));
-        LinearLayout header = row();
-        LinearLayout titles = column();
-        TextView eyebrow = text("YOUR FAVORITES", 11, R.color.auren_primary);
-        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text("Favoritos", 30, R.color.text_primary);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        titles.addView(eyebrow);
-        titles.addView(title, margins(0, 3, 0, 0));
-        header.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
-        ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Search music");
-        search.setOnClickListener(v -> showSearchDialog());
-        header.addView(search, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        content.addView(header);
-
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout list = column();
-        List<Track> source = new ArrayList<>();
-        for (Track t : tracks) if (isFavorite(t)) source.add(t);
-        if (source.isEmpty()) {
-            list.addView(emptyCard("Ainda não há favoritos. Toque no coração durante a reprodução."));
+        ImageView art = new ImageView(this);
+        art.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (miniArt != null && miniArt.getDrawable() != null) {
+            art.setImageDrawable(miniArt.getDrawable());
         } else {
-            for (Track t : source) list.addView(trackRow(t, 0));
+            art.setImageResource(android.R.drawable.ic_media_play);
+            DrawableCompat.setTint(art.getDrawable(), Color.WHITE);
         }
-        scroll.addView(list);
-        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        pageContainer.addView(content);
-    }
-
-    private View librarySectionCard(String title, String subtitle, String icon, View.OnClickListener listener) {
-        LinearLayout card = rounded(Color.WHITE, 20);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14), dp(12), dp(12), dp(12));
-        card.setElevation(dp(2));
-
-        TextView iconView = text(icon, 25, R.color.auren_primary);
-        iconView.setGravity(Gravity.CENTER);
-        iconView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(iconView, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        media.addView(art, new LinearLayout.LayoutParams(dp(88), dp(88)));
 
         LinearLayout info = column();
-        TextView name = text(title, 16, R.color.text_primary);
-        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        info.addView(name);
-        info.addView(text(subtitle, 12, R.color.text_secondary), margins(0, 3, 0, 0));
-        card.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+        info.setPadding(dp(14), 0, 0, 0);
+        TextView eyebrow = text("AGORA NO AUREN", 10, android.R.color.white);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(eyebrow);
 
-        TextView arrow = text("›", 28, R.color.text_secondary);
-        arrow.setGravity(Gravity.CENTER);
-        card.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(48)));
-        card.setOnClickListener(listener);
+        String heroTitle = miniTitle == null ? "A música move você" : miniTitle.getText().toString();
+        if (heroTitle.trim().isEmpty()) heroTitle = "A música move você";
+        TextView title = text(heroTitle, 20, android.R.color.white);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(title, margins(0, 4, 0, 2));
+
+        String heroArtist = miniArtist == null ? "Descubra, ouça e aproveite" : miniArtist.getText().toString();
+        if (heroArtist.trim().isEmpty()) heroArtist = "Descubra, ouça e aproveite";
+        info.addView(text(heroArtist, 12, android.R.color.white));
+
+        TextView action = text("Abrir reprodução  ›", 12, android.R.color.white);
+        action.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(action, margins(0, 12, 0, 0));
+        media.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+
+        card.addView(media);
+        card.setOnClickListener(v -> {
+            if (currentTrack != null) showNowPlaying();
+        });
         return card;
     }
+'''
+if 'private View buildHomeHero()' not in text:
+    insertion = text.find('    private void showHome()')
+    if insertion >= 0:
+        text = text[:insertion] + hero_method + '\n' + text[insertion:]
 
-    private void showRecent() {
-        setActiveTab(libraryTab);
-        pageContainer.removeAllViews();
-        LinearLayout content = column();
-        content.setPadding(dp(20), dp(16), dp(20), dp(18));
-        TextView eyebrow = text("YOUR HISTORY", 11, R.color.auren_primary);
-        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text("Recentes", 30, R.color.text_primary);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        content.addView(eyebrow);
-        content.addView(title, margins(0, 3, 0, 14));
+# Replace the old popup with a real left-side menu like the reference design.
+drawer_method = '''    private void showAppMenu(View anchor) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout root = column();
+        root.setBackgroundColor(getColor(R.color.surface));
+
+        LinearLayout header = column();
+        header.setPadding(dp(20), dp(28), dp(20), dp(20));
+        header.setBackgroundColor(getColor(R.color.auren_primary));
+
+        TextView brand = text("AUREN", 25, android.R.color.white);
+        brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        header.addView(brand);
+        TextView subtitle = text("Music Player", 13, android.R.color.white);
+        header.addView(subtitle, margins(0, 2, 0, 0));
+        TextView version = text("Versão " + BuildConfig.VERSION_NAME, 11, android.R.color.white);
+        header.addView(version, margins(0, 12, 0, 0));
+        root.addView(header);
+
         ScrollView scroll = new ScrollView(this);
-        LinearLayout list = column();
-        if (recentTracks.isEmpty()) {
-            list.addView(emptyCard("As músicas reproduzidas aparecerão aqui."));
-        } else {
-            for (Track t : recentTracks) list.addView(trackRow(t, 0));
+        LinearLayout items = column();
+        items.setPadding(dp(10), dp(12), dp(10), dp(16));
+
+        addDrawerItem(items, "⌂", "Início", () -> { dialog.dismiss(); showHome(); });
+        addDrawerItem(items, "♫", "Biblioteca", () -> { dialog.dismiss(); showLibrary(); });
+        addDrawerItem(items, "♥", "Favoritos", () -> { dialog.dismiss(); showLibrary(true); });
+        addDrawerItem(items, "▤", "Playlists", () -> { dialog.dismiss(); showPlaylists(); });
+        addDrawerItem(items, "🔥", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
+        addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
+        addDrawerItem(items, "✦", "Sugestões", () -> { dialog.dismiss(); showSuggestions(); });
+
+        View divider = new View(this);
+        divider.setBackgroundColor(0xFFE4E8EF);
+        items.addView(divider, new LinearLayout.LayoutParams(-1, dp(1), 1));
+
+        addDrawerItem(items, "⚙", "Configurações", () -> {
+            dialog.dismiss();
+            startActivity(new Intent(this, SettingsActivity.class));
+        });
+        addDrawerItem(items, "ⓘ", "Sobre Auren", () -> { dialog.dismiss(); showAboutDialog(); });
+
+        scroll.addView(items);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        dialog.setContentView(root);
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setDimAmount(0.28f);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setGravity(Gravity.START | Gravity.TOP);
+            window.setLayout(dp(320), -1);
         }
-        scroll.addView(list);
-        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        pageContainer.addView(content);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.show();
+        window = dialog.getWindow();
+        if (window != null) {
+            window.setGravity(Gravity.START | Gravity.TOP);
+            window.setLayout(Math.min(dp(330), getResources().getDisplayMetrics().widthPixels - dp(24)), -1);
+        }
     }
 
-    private void showSuggestions() {
-        setActiveTab(libraryTab);
-        pageContainer.removeAllViews();
-        LinearLayout content = column();
-        content.setPadding(dp(20), dp(16), dp(20), dp(18));
-        TextView eyebrow = text("FOR YOU", 11, R.color.auren_primary);
-        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text("Sugestões", 30, R.color.text_primary);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        content.addView(eyebrow);
-        content.addView(title, margins(0, 3, 0, 14));
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout list = column();
-        List<Track> suggestions = suggestionTracks();
-        if (suggestions.isEmpty()) {
-            list.addView(emptyCard("As sugestões aparecerão quando sua biblioteca for carregada."));
-        } else {
-            for (Track t : suggestions) list.addView(trackRow(t, 0));
-        }
-        scroll.addView(list);
-        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        pageContainer.addView(content);
+    private void addDrawerItem(LinearLayout parent, String icon, String label, Runnable action) {
+        LinearLayout item = row();
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(dp(14), dp(8), dp(12), dp(8));
+        item.setBackground(roundDrawable(Color.WHITE, 16));
+
+        TextView iconView = text(icon, 22, R.color.text_secondary);
+        iconView.setGravity(Gravity.CENTER);
+        item.addView(iconView, new LinearLayout.LayoutParams(dp(48), dp(50)));
+
+        TextView name = text(label, 15, R.color.text_primary);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        item.addView(name, new LinearLayout.LayoutParams(0, dp(50), 1));
+
+        TextView arrow = text("›", 25, R.color.text_secondary);
+        item.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(50)));
+        item.setOnClickListener(v -> action.run());
+        parent.addView(item, margins(0, 3, 0, 3));
     }
-
 '''
-text = text[:start] + library_block + text[end:]
-
-# Route the existing Library entry points to the new Library hub.
-text = text.replace('showLibrary(false)', 'showLibrary()')
-
-# Keep the menu useful in Portuguese and include the requested Library hub.
-old_menu = '''        menu.getMenu().add("Home");
-        menu.getMenu().add("Library");
-        menu.getMenu().add("Favorites");
-        menu.getMenu().add("Playlists");
-        menu.getMenu().add("Most played");
-        menu.getMenu().add("Settings");
-        menu.getMenu().add("About Auren");
-'''
-new_menu = '''        menu.getMenu().add("Início");
-        menu.getMenu().add("Biblioteca");
-        menu.getMenu().add("Favoritos");
-        menu.getMenu().add("Playlists");
-        menu.getMenu().add("Mais tocadas");
-        menu.getMenu().add("Configurações");
-        menu.getMenu().add("Sobre Auren");
-'''
-text = text.replace(old_menu, new_menu, 1)
-old_routes = '''            if (title.equals("Home")) showHome();
-            else if (title.equals("Library")) showLibrary();
-            else if (title.equals("Favorites")) showLibrary(true);
-            else if (title.equals("Playlists")) showPlaylists();
-            else if (title.equals("Most played")) showMostPlayed();
-            else if (title.equals("Settings")) startActivity(new Intent(this, SettingsActivity.class));
-            else if (title.equals("About Auren")) showAboutDialog();
-'''
-new_routes = '''            if (title.equals("Início")) showHome();
-            else if (title.equals("Biblioteca")) showLibrary();
-            else if (title.equals("Favoritos")) showLibrary(true);
-            else if (title.equals("Playlists")) showPlaylists();
-            else if (title.equals("Mais tocadas")) showMostPlayed();
-            else if (title.equals("Configurações")) startActivity(new Intent(this, SettingsActivity.class));
-            else if (title.equals("Sobre Auren")) showAboutDialog();
-'''
-text = text.replace(old_routes, new_routes, 1)
+if 'private void addDrawerItem' not in text:
+    text = text.replace('import android.view.Window;\n', 'import android.view.Window;\nimport android.view.WindowManager;\n', 1)
+    updated, changed = replace_method(text, 'showAppMenu', drawer_method)
+    if changed:
+        text = updated
 
 path.write_text(text)
-print("Top menu and Library hub enhancement completed.")
+print("Auren visual enhancement completed: hero artwork + side menu.")
