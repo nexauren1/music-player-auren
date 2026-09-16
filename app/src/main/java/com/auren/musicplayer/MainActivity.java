@@ -1005,6 +1005,12 @@ public class MainActivity extends ComponentActivity {
     }
 
 
+    private boolean isCustomPlaylist(String name) {
+        return getSharedPreferences("auren_player", MODE_PRIVATE)
+                .getStringSet("playlist_names", new HashSet<>())
+                .contains(name);
+    }
+
     private View playlistCard(String title, String subtitle, int count, boolean favorite) {
         LinearLayout card = rounded(favorite ? 0xFFEEECFF : 0xFFFFFFFF, 18);
         card.setGravity(Gravity.CENTER_VERTICAL);
