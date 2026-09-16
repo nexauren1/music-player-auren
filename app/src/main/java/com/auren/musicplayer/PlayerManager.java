@@ -2,6 +2,7 @@ package com.auren.musicplayer;
 
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -19,6 +20,7 @@ public final class PlayerManager {
     private static Context appContext;
     private static boolean shuffle;
     private static boolean repeat;
+    private static boolean preparing;
 
     private PlayerManager() {
     }
@@ -44,6 +46,10 @@ public final class PlayerManager {
         }
     }
 
+    public static boolean isPreparing() {
+        return preparing;
+    }
+
     public static boolean isShuffle() {
         return shuffle;
     }
@@ -64,7 +70,7 @@ public final class PlayerManager {
         try {
             return player == null ? 0 : player.getDuration();
         } catch (Exception e) {
-            return 0;
+            return currentSong == null ? 0 : (int) currentSong.duration;
         }
     }
 
@@ -74,42 +80,61 @@ public final class PlayerManager {
     }
 
     public static void play(Context context, Song song) {
-        if (song == null || song.uri == null) return;
+        if (context == null || song == null || song.uri == null) return;
+
         appContext = context.getApplicationContext();
-        startPlaybackService();
-        releasePlayerOnly();
         currentSong = song;
+        preparing = true;
+        releasePlayerOnly();
+        startPlaybackService();
+        notifyChanged();
+
         try {
-            player = new MediaPlayer();
-            player.setAudioStreamType(AudioManager.STREAM_MUSIC);
-            player.setDataSource(appContext, song.uri);
-            player.setOnPreparedListener(mp -> {
+            MediaPlayer newPlayer = new MediaPlayer();
+            player = newPlayer;
+            configureAudio(newPlayer);
+            newPlayer.setDataSource(appContext, song.uri);
+            newPlayer.setOnPreparedListener(mp -> {
+                if (mp != player) return;
+                preparing = false;
                 mp.start();
                 notifyChanged();
             });
-            player.setOnCompletionListener(mp -> handleCompletion());
-            player.setOnErrorListener((mp, what, extra) -> {
-                releasePlayerOnly();
-                notifyChanged();
+            newPlayer.setOnCompletionListener(mp -> {
+                preparing = false;
+                handleCompletion();
+            });
+            newPlayer.setOnErrorListener((mp, what, extra) -> {
+                if (mp == player) {
+                    preparing = false;
+                    releasePlayerOnly();
+                    notifyChanged();
+                }
                 return true;
             });
-            player.prepareAsync();
-            notifyChanged();
+            newPlayer.prepareAsync();
         } catch (Exception e) {
+            preparing = false;
             releasePlayerOnly();
             notifyChanged();
         }
     }
 
+    private static void configureAudio(MediaPlayer mediaPlayer) {
+        if (Build.VERSION.SDK_INT >= 21) {
+            mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .build());
+        } else {
+            mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+        }
+    }
+
     private static void handleCompletion() {
-        if (repeat && player != null && appContext != null) {
-            try {
-                player.seekTo(0);
-                player.start();
-                notifyChanged();
-                return;
-            } catch (Exception ignored) {
-            }
+        if (repeat && currentSong != null && appContext != null) {
+            play(appContext, currentSong);
+            return;
         }
         if (queue.length > 1 && appContext != null) {
             next(appContext, queue);
@@ -119,19 +144,30 @@ public final class PlayerManager {
     }
 
     public static void toggle() {
-        if (player == null) return;
+        if (player == null) {
+            if (currentSong != null && appContext != null) {
+                play(appContext, currentSong);
+            }
+            return;
+        }
         try {
-            if (player.isPlaying()) player.pause();
-            else player.start();
+            if (player.isPlaying()) {
+                player.pause();
+            } else if (!preparing) {
+                player.start();
+            }
             notifyChanged();
         } catch (Exception ignored) {
+            if (currentSong != null && appContext != null) {
+                play(appContext, currentSong);
+            }
         }
     }
 
     public static void seekTo(int position) {
-        if (player == null) return;
+        if (player == null || preparing) return;
         try {
-            player.seekTo(position);
+            player.seekTo(Math.max(0, position));
         } catch (Exception ignored) {
         }
     }
@@ -179,20 +215,21 @@ public final class PlayerManager {
     }
 
     public static void release() {
+        preparing = false;
         releasePlayerOnly();
     }
 
     private static void releasePlayerOnly() {
-        if (player != null) {
-            try {
-                player.stop();
-            } catch (Exception ignored) {
-            }
-            try {
-                player.release();
-            } catch (Exception ignored) {
-            }
-            player = null;
+        MediaPlayer old = player;
+        player = null;
+        preparing = false;
+        if (old != null) {
+            try { old.setOnPreparedListener(null); } catch (Exception ignored) { }
+            try { old.setOnCompletionListener(null); } catch (Exception ignored) { }
+            try { old.setOnErrorListener(null); } catch (Exception ignored) { }
+            try { old.stop(); } catch (Exception ignored) { }
+            try { old.reset(); } catch (Exception ignored) { }
+            try { old.release(); } catch (Exception ignored) { }
         }
     }
 
