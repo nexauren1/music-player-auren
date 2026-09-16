@@ -1022,6 +1022,7 @@ public class MainActivity extends ComponentActivity {
         c.setGravity(Gravity.CENTER);
         card.addView(c, new LinearLayout.LayoutParams(dp(48), dp(66)));
         if (favorite) card.setOnClickListener(v -> showLibrary(true));
+        else if (isCustomPlaylist(title)) card.setOnClickListener(v -> showPlaylistPage(title));
         return card;
     }
 
