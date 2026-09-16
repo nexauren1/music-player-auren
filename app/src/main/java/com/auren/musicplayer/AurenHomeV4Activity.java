@@ -20,8 +20,6 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -96,7 +94,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
 
         LinearLayout top = row();
         TextView menu = action("☰", Color.WHITE, 25);
-        top.addView(menu, size(0, 48, 0));
+        top.addView(menu, size(48, 48));
 
         TextView brand = text("AUREN", 22, Color.WHITE);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -493,7 +491,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         box.addView(msg);
 
         if (!hasAudioPermission()) {
-            TextView grant = action("Permitir acesso às músicas", 13, GREEN);
+            TextView grant = action(
+                    "Permitir acesso às músicas", GREEN, 13);
             grant.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
             grant.setPadding(0, dp(14), 0, 0);
             grant.setOnClickListener(v -> requestAudioPermission());
@@ -528,7 +527,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 MediaStore.Audio.Media.TITLE
                         + " COLLATE NOCASE ASC")) {
             if (cursor == null) {
-                showLibraryError("Não foi possível ler a biblioteca de música.");
+                showLibraryError(
+                        "Não foi possível ler a biblioteca de música.");
                 return;
             }
 
@@ -550,8 +550,10 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                         String.valueOf(songId));
                 songs.add(new PlayerManager.Song(
                         safe(cursor.getString(title), "Sem título"),
-                        safe(cursor.getString(artist), "Artista desconhecido"),
-                        safe(cursor.getString(album), "Álbum desconhecido"),
+                        safe(cursor.getString(artist),
+                                "Artista desconhecido"),
+                        safe(cursor.getString(album),
+                                "Álbum desconhecido"),
                         cursor.getLong(duration),
                         uri));
             }
@@ -576,7 +578,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 ? Manifest.permission.READ_MEDIA_AUDIO
                 : Manifest.permission.READ_EXTERNAL_STORAGE;
         return Build.VERSION.SDK_INT < 23
-                || checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+                || checkSelfPermission(permission)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestAudioPermission() {
@@ -702,7 +705,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         return valueView;
     }
 
-    private TextView action(String value, float size, int color) {
+    private TextView action(String value, int color, float size) {
         TextView valueView = text(value, size, color);
         valueView.setGravity(Gravity.CENTER);
         valueView.setClickable(true);
@@ -710,15 +713,10 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     }
 
     private LinearLayout.LayoutParams size(int width, int height) {
-        return size(width, height, 0);
-    }
-
-    private LinearLayout.LayoutParams size(
-            int width, int height, float weight) {
-        int resolvedWidth = width == 0 ? 0 : (width < 0 ? width : dp(width));
+        int resolvedWidth = width < 0 ? width : dp(width);
         int resolvedHeight = height < 0 ? height : dp(height);
         return new LinearLayout.LayoutParams(
-                resolvedWidth, resolvedHeight, weight);
+                resolvedWidth, resolvedHeight);
     }
 
     private LinearLayout.LayoutParams weight(float weight, int height) {
