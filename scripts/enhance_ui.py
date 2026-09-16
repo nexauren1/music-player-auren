@@ -91,7 +91,7 @@ hero_method = '''    private View buildHomeHero() {
 
         card.addView(media);
         card.setOnClickListener(v -> {
-            if (currentTrack != null) showNowPlaying();
+            if (currentTrack != null) openNowPlaying();
         });
         return card;
     }
@@ -164,10 +164,9 @@ drawer_method = '''    private void showAppMenu(View anchor) {
     }
 
     private void addDrawerItem(LinearLayout parent, String icon, String label, Runnable action) {
-        LinearLayout item = row();
+        LinearLayout item = rounded(Color.WHITE, 16);
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(14), dp(8), dp(12), dp(8));
-        item.setBackground(roundDrawable(Color.WHITE, 16));
 
         TextView iconView = text(icon, 22, R.color.text_secondary);
         iconView.setGravity(Gravity.CENTER);
