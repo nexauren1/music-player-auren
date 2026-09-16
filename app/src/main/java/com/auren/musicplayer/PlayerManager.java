@@ -2,12 +2,13 @@ package com.auren.musicplayer;
 
 import android.content.Context;
 import android.content.Intent;
-import android.media.AudioAttributes;
-import android.media.AudioManager;
-import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
-import android.os.PowerManager;
+
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
 
 public final class PlayerManager {
     public interface Listener {
@@ -17,7 +18,7 @@ public final class PlayerManager {
         }
     }
 
-    private static MediaPlayer player;
+    private static ExoPlayer player;
     private static Song currentSong;
     private static Song[] queue = new Song[0];
     private static Listener listener;
@@ -43,11 +44,7 @@ public final class PlayerManager {
     }
 
     public static boolean isPlaying() {
-        try {
-            return player != null && player.isPlaying();
-        } catch (Exception e) {
-            return false;
-        }
+        return player != null && player.isPlaying();
     }
 
     public static boolean isPreparing() {
@@ -63,21 +60,21 @@ public final class PlayerManager {
     }
 
     public static int getPosition() {
-        try {
-            return player == null ? 0 : player.getCurrentPosition();
-        } catch (Exception e) {
+        if (player == null) {
             return 0;
         }
+        return (int) Math.max(0, player.getCurrentPosition());
     }
 
     public static int getDuration() {
-        try {
-            return player == null ? 0 : player.getDuration();
-        } catch (Exception e) {
-            return currentSong == null
-                    ? 0
-                    : (int) currentSong.duration;
+        if (player == null) {
+            return currentSong == null ? 0 : (int) currentSong.duration;
         }
+        long duration = player.getDuration();
+        if (duration == Player.TIME_UNSET || duration < 0) {
+            return currentSong == null ? 0 : (int) currentSong.duration;
+        }
+        return (int) duration;
     }
 
     public static void setQueue(Song[] songs) {
@@ -87,97 +84,83 @@ public final class PlayerManager {
 
     public static void play(Context context, Song song) {
         if (context == null || song == null || song.uri == null) {
+            notifyError("Esta música não está disponível.");
             return;
         }
 
         appContext = context.getApplicationContext();
         currentSong = song;
-        releasePlayerOnly();
         preparing = true;
+        ensurePlayer();
         startPlaybackService();
         notifyChanged();
 
         try {
-            MediaPlayer newPlayer = new MediaPlayer();
-            player = newPlayer;
-            configureAudio(newPlayer);
-            newPlayer.setWakeMode(
-                    appContext,
-                    PowerManager.PARTIAL_WAKE_LOCK);
-            newPlayer.setVolume(1.0f, 1.0f);
-
-            // MediaStore gives us a content:// URI. Let MediaPlayer
-            // open it through ContentResolver instead of passing a
-            // temporary file descriptor to an asynchronous player.
-            newPlayer.setDataSource(appContext, song.uri);
-
-            newPlayer.setOnPreparedListener(mp -> {
-                if (mp != player) {
-                    return;
-                }
-                preparing = false;
-                try {
-                    mp.start();
-                } catch (Exception e) {
-                    failPlayback(
-                            "Não foi possível iniciar esta música.");
-                    return;
-                }
-                notifyChanged();
-            });
-
-            newPlayer.setOnCompletionListener(mp -> {
-                preparing = false;
-                handleCompletion();
-            });
-
-            newPlayer.setOnErrorListener((mp, what, extra) -> {
-                if (mp == player) {
-                    preparing = false;
-                    releasePlayerOnly();
-                    notifyError(
-                            "Não foi possível reproduzir esta música. "
-                                    + "Erro " + what + "/" + extra + ".");
-                    notifyChanged();
-                }
-                return true;
-            });
-
-            newPlayer.prepareAsync();
-        } catch (SecurityException e) {
-            failPlayback(
-                    "O acesso à música foi bloqueado. "
-                            + "Verifique a permissão de áudio.");
+            MediaItem item = MediaItem.fromUri(song.uri);
+            player.setMediaItem(item);
+            player.prepare();
+            player.play();
         } catch (Exception e) {
-            failPlayback(
-                    "Não foi possível abrir este ficheiro de áudio.");
+            failPlayback("Não foi possível iniciar esta música.");
         }
     }
 
-    private static void configureAudio(MediaPlayer mediaPlayer) {
-        if (Build.VERSION.SDK_INT >= 21) {
-            mediaPlayer.setAudioAttributes(
-                    new AudioAttributes.Builder()
-                            .setContentType(
-                                    AudioAttributes.CONTENT_TYPE_MUSIC)
-                            .setUsage(
-                                    AudioAttributes.USAGE_MEDIA)
-                            .build());
-        } else {
-            mediaPlayer.setAudioStreamType(
-                    AudioManager.STREAM_MUSIC);
-        }
-    }
-
-    private static void handleCompletion() {
-        if (repeat && currentSong != null && appContext != null) {
-            play(appContext, currentSong);
+    private static void ensurePlayer() {
+        if (player != null) {
             return;
         }
-        if (queue.length > 1 && appContext != null) {
-            next(appContext, queue);
-        } else {
-            notifyChanged();
+
+        player = new ExoPlayer.Builder(appContext).build();
+        player.setRepeatMode(
+                Player.REPEAT_MODE_OFF);
+        player.setShuffleModeEnabled(shuffle);
+
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onPlaybackStateChanged(int state) {
+                preparing = state == Player.STATE_BUFFERING
+                        || state == Player.STATE_IDLE;
+
+                if (state == Player.STATE_READY) {
+                    preparing = false;
+                    notifyChanged();
+                }
+            }
+
+            @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+                if (isPlaying) {
+                    preparing = false;
+                }
+                notifyChanged();
+            }
+
+            @Override
+            public void onMediaItemTransition(
+                    MediaItem mediaItem,
+                    int reason) {
+                updateCurrentSongFromIndex();
+                notifyChanged();
+            }
+
+            @Override
+            public void onPlayerError(PlaybackException error) {
+                preparing = false;
+                notifyError(
+                        "Não foi possível reproduzir esta música. "
+                                + "Erro " + error.errorCode + ".");
+                notifyChanged();
+            }
+        });
+    }
+
+    private static void updateCurrentSongFromIndex() {
+        if (player == null || queue.length == 0) {
+            return;
+        }
+        int index = player.getCurrentMediaItemIndex();
+        if (index >= 0 && index < queue.length) {
+            currentSong = queue[index];
         }
     }
 
@@ -189,28 +172,22 @@ public final class PlayerManager {
             return;
         }
 
-        try {
-            if (player.isPlaying()) {
-                player.pause();
-            } else if (!preparing) {
-                player.start();
-            }
-            notifyChanged();
-        } catch (Exception e) {
-            if (currentSong != null && appContext != null) {
-                play(appContext, currentSong);
-            }
+        if (player.isPlaying()) {
+            player.pause();
+        } else if (player.getPlaybackState() == Player.STATE_IDLE) {
+            player.prepare();
+            player.play();
+        } else {
+            player.play();
         }
+        notifyChanged();
     }
 
     public static void seekTo(int position) {
-        if (player == null || preparing) {
+        if (player == null) {
             return;
         }
-        try {
-            player.seekTo(Math.max(0, position));
-        } catch (Exception ignored) {
-        }
+        player.seekTo(Math.max(0, position));
     }
 
     public static void next(Context context, Song[] songs) {
@@ -224,9 +201,15 @@ public final class PlayerManager {
 
         appContext = context.getApplicationContext();
         queue = source.clone();
+
+        if (player != null && player.getMediaItemCount() == source.length) {
+            player.seekToNextMediaItem();
+            player.play();
+            return;
+        }
+
         int index = indexOf(source, currentSong);
         int next;
-
         if (shuffle && source.length > 1) {
             do {
                 next = (int) (Math.random() * source.length);
@@ -248,8 +231,15 @@ public final class PlayerManager {
 
         appContext = context.getApplicationContext();
         queue = source.clone();
+
         if (getPosition() > 3000) {
             seekTo(0);
+            return;
+        }
+
+        if (player != null && player.getMediaItemCount() == source.length) {
+            player.seekToPreviousMediaItem();
+            player.play();
             return;
         }
 
@@ -263,55 +253,40 @@ public final class PlayerManager {
 
     public static void setShuffle(boolean value) {
         shuffle = value;
+        if (player != null) {
+            player.setShuffleModeEnabled(value);
+        }
         notifyChanged();
     }
 
     public static void setRepeat(boolean value) {
         repeat = value;
+        if (player != null) {
+            player.setRepeatMode(
+                    value
+                            ? Player.REPEAT_MODE_ONE
+                            : Player.REPEAT_MODE_OFF);
+        }
         notifyChanged();
     }
 
     public static void release() {
         preparing = false;
-        releasePlayerOnly();
-    }
-
-    private static void releasePlayerOnly() {
-        MediaPlayer old = player;
-        player = null;
-        preparing = false;
-
-        if (old != null) {
-            try {
-                old.setOnPreparedListener(null);
-            } catch (Exception ignored) {
-            }
-            try {
-                old.setOnCompletionListener(null);
-            } catch (Exception ignored) {
-            }
-            try {
-                old.setOnErrorListener(null);
-            } catch (Exception ignored) {
-            }
-            try {
-                old.stop();
-            } catch (Exception ignored) {
-            }
-            try {
-                old.reset();
-            } catch (Exception ignored) {
-            }
-            try {
-                old.release();
-            } catch (Exception ignored) {
-            }
+        if (player != null) {
+            player.release();
+            player = null;
         }
+        notifyChanged();
     }
 
     private static void failPlayback(String message) {
         preparing = false;
-        releasePlayerOnly();
+        if (player != null) {
+            try {
+                player.stop();
+            } catch (Exception ignored) {
+            }
+        }
         notifyError(message);
         notifyChanged();
     }
@@ -351,7 +326,11 @@ public final class PlayerManager {
                     PlaybackService.class);
             intent.setAction(PlaybackService.ACTION_UPDATE);
             try {
-                appContext.startService(intent);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    appContext.startForegroundService(intent);
+                } else {
+                    appContext.startService(intent);
+                }
             } catch (Exception ignored) {
             }
         }
