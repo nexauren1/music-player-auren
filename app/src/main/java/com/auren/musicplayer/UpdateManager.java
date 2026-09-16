@@ -18,6 +18,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import io.sigpipe.jbsdiff.Patch;
+
 public class UpdateManager {
     private static final String API =
             "https://api.github.com/repos/nexauren1/"
@@ -31,12 +33,22 @@ public class UpdateManager {
     public static class UpdateInfo {
         public final String version;
         public final String tag;
-        public final String url;
+        public final String apkUrl;
+        public final String patchUrl;
 
-        UpdateInfo(String version, String tag, String url) {
+        UpdateInfo(
+                String version,
+                String tag,
+                String apkUrl,
+                String patchUrl) {
             this.version = version;
             this.tag = tag;
-            this.url = url;
+            this.apkUrl = apkUrl;
+            this.patchUrl = patchUrl;
+        }
+
+        public boolean hasDelta() {
+            return patchUrl != null && !patchUrl.isEmpty();
         }
     }
 
@@ -63,13 +75,23 @@ public class UpdateManager {
                 JSONObject release = new JSONObject(json);
                 String tag = release.optString("tag_name", "");
                 String version = extractVersion(tag);
-                String apkUrl = findApk(release.optJSONArray("assets"));
+                JSONArray assets = release.optJSONArray("assets");
+                String apkUrl = findApk(assets);
+                String current = BuildConfig.VERSION_NAME;
+                String patchUrl = findPatch(
+                        assets,
+                        current,
+                        version);
 
                 if (version.isEmpty() || apkUrl.isEmpty()) {
                     throw new Exception("No APK release found");
                 }
 
-                UpdateInfo info = new UpdateInfo(version, tag, apkUrl);
+                UpdateInfo info = new UpdateInfo(
+                        version,
+                        tag,
+                        apkUrl,
+                        patchUrl);
                 ((Activity) context).runOnUiThread(
                         () -> callback.onResult(info));
             } catch (Exception e) {
@@ -98,92 +120,83 @@ public class UpdateManager {
     public static void downloadAndInstall(
             Activity activity,
             UpdateInfo info) {
-        Toast.makeText(
-                activity,
-                "A baixar atualização...",
-                Toast.LENGTH_SHORT).show();
-
-        DownloadManager manager = (DownloadManager)
-                activity.getSystemService(Context.DOWNLOAD_SERVICE);
-        if (manager == null) {
-            showError(activity, "Não foi possível iniciar o download.");
-            return;
+        if (info.hasDelta()) {
+            downloadDelta(activity, info);
+        } else {
+            downloadApk(activity, info);
         }
-
-        File destination = new File(
-                activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-                "Auren-Music-Player-" + info.version + ".apk");
-
-        if (destination.exists() && destination.length() > 0) {
-            install(activity, FileProvider.getUriForFile(
-                    activity,
-                    activity.getPackageName() + ".fileprovider",
-                    destination));
-            return;
-        }
-
-        Uri uri = Uri.parse(info.url);
-        DownloadManager.Request request =
-                new DownloadManager.Request(uri);
-        request.setTitle("Auren Music Player " + info.version);
-        request.setDescription("A baixar atualização...");
-        request.setNotificationVisibility(
-                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        request.setDestinationUri(Uri.fromFile(destination));
-
-        long id = manager.enqueue(request);
-        waitForDownload(activity, manager, id, info.version);
     }
 
-    private static void waitForDownload(
+    private static void downloadDelta(
+            Activity activity,
+            UpdateInfo info) {
+        Toast.makeText(
+                activity,
+                "A baixar atualização otimizada...",
+                Toast.LENGTH_SHORT).show();
+
+        DownloadManager manager = getManager(activity);
+        if (manager == null) return;
+
+        File patch = new File(
+                activity.getExternalFilesDir(
+                        Environment.DIRECTORY_DOWNLOADS),
+                "Auren-Update-"
+                        + BuildConfig.VERSION_NAME
+                        + "-to-"
+                        + info.version
+                        + ".patch");
+
+        if (patch.exists() && patch.length() > 0) {
+            applyDelta(activity, info, patch);
+            return;
+        }
+
+        DownloadManager.Request request =
+                new DownloadManager.Request(Uri.parse(info.patchUrl));
+        request.setTitle("Auren Music Player " + info.version);
+        request.setDescription("A baixar apenas as alterações...");
+        request.setNotificationVisibility(
+                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        request.setDestinationUri(Uri.fromFile(patch));
+
+        long id = manager.enqueue(request);
+        waitForPatch(activity, manager, id, info, patch);
+    }
+
+    private static void waitForPatch(
             Activity activity,
             DownloadManager manager,
             long id,
-            String version) {
+            UpdateInfo info,
+            File patch) {
         new Thread(() -> {
             DownloadManager.Query query =
                     new DownloadManager.Query().setFilterById(id);
-            boolean finished = false;
 
-            while (!finished) {
+            while (true) {
                 try {
                     Thread.sleep(500);
                     android.database.Cursor result =
                             manager.query(query);
                     if (result == null) continue;
+
                     try {
                         if (!result.moveToFirst()) continue;
                         int status = result.getInt(
                                 result.getColumnIndexOrThrow(
                                         DownloadManager.COLUMN_STATUS));
+
                         if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                            finished = true;
-                            File file = new File(
-                                    activity.getExternalFilesDir(
-                                            Environment.DIRECTORY_DOWNLOADS),
-                                    "Auren-Music-Player-" + version + ".apk");
-                            activity.runOnUiThread(() -> {
-                                Toast.makeText(
-                                        activity,
-                                        "Download concluído. A atualizar...",
-                                        Toast.LENGTH_SHORT).show();
-                                if (file.exists() && file.length() > 0) {
-                                    Uri uri = FileProvider.getUriForFile(
-                                            activity,
-                                            activity.getPackageName()
-                                                    + ".fileprovider",
-                                            file);
-                                    install(activity, uri);
-                                } else {
-                                    showError(activity,
-                                            "APK da atualização não encontrado.");
-                                }
-                            });
-                        } else if (status == DownloadManager.STATUS_FAILED) {
-                            finished = true;
-                            activity.runOnUiThread(() -> showError(
-                                    activity,
-                                    "Não foi possível baixar a atualização."));
+                            activity.runOnUiThread(() ->
+                                    applyDelta(activity, info, patch));
+                            return;
+                        }
+
+                        if (status == DownloadManager.STATUS_FAILED) {
+                            activity.runOnUiThread(() ->
+                                    downloadApk(activity, info));
+                            return;
                         }
                     } finally {
                         result.close();
@@ -195,6 +208,156 @@ public class UpdateManager {
                 }
             }
         }).start();
+    }
+
+    private static void applyDelta(
+            Activity activity,
+            UpdateInfo info,
+            File patch) {
+        new Thread(() -> {
+            File oldApk = new File(
+                    activity.getApplicationInfo().sourceDir);
+            File output = new File(
+                    activity.getExternalFilesDir(
+                            Environment.DIRECTORY_DOWNLOADS),
+                    "Auren-Music-Player-" + info.version + ".apk");
+
+            try {
+                if (output.exists()) output.delete();
+
+                Patch.patch(oldApk, output, patch);
+
+                if (!output.exists() || output.length() < 100000) {
+                    throw new Exception("Invalid patched APK");
+                }
+
+                activity.runOnUiThread(() -> {
+                    Toast.makeText(
+                            activity,
+                            "Atualização pronta. A instalar...",
+                            Toast.LENGTH_SHORT).show();
+                    install(activity, FileProvider.getUriForFile(
+                            activity,
+                            activity.getPackageName()
+                                    + ".fileprovider",
+                            output));
+                });
+            } catch (Exception e) {
+                if (output.exists()) output.delete();
+                activity.runOnUiThread(() -> {
+                    Toast.makeText(
+                            activity,
+                            "Delta inválido. A baixar APK completo...",
+                            Toast.LENGTH_SHORT).show();
+                    downloadApk(activity, info);
+                });
+            }
+        }).start();
+    }
+
+    private static void downloadApk(
+            Activity activity,
+            UpdateInfo info) {
+        Toast.makeText(
+                activity,
+                "A baixar atualização completa...",
+                Toast.LENGTH_SHORT).show();
+
+        DownloadManager manager = getManager(activity);
+        if (manager == null) return;
+
+        File destination = new File(
+                activity.getExternalFilesDir(
+                        Environment.DIRECTORY_DOWNLOADS),
+                "Auren-Music-Player-" + info.version + ".apk");
+
+        if (destination.exists() && destination.length() > 0) {
+            install(activity, FileProvider.getUriForFile(
+                    activity,
+                    activity.getPackageName() + ".fileprovider",
+                    destination));
+            return;
+        }
+
+        DownloadManager.Request request =
+                new DownloadManager.Request(Uri.parse(info.apkUrl));
+        request.setTitle("Auren Music Player " + info.version);
+        request.setDescription("A baixar atualização completa...");
+        request.setNotificationVisibility(
+                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        request.setDestinationUri(Uri.fromFile(destination));
+
+        long id = manager.enqueue(request);
+        waitForApk(activity, manager, id, info.version);
+    }
+
+    private static void waitForApk(
+            Activity activity,
+            DownloadManager manager,
+            long id,
+            String version) {
+        new Thread(() -> {
+            DownloadManager.Query query =
+                    new DownloadManager.Query().setFilterById(id);
+
+            while (true) {
+                try {
+                    Thread.sleep(500);
+                    android.database.Cursor result =
+                            manager.query(query);
+                    if (result == null) continue;
+
+                    try {
+                        if (!result.moveToFirst()) continue;
+                        int status = result.getInt(
+                                result.getColumnIndexOrThrow(
+                                        DownloadManager.COLUMN_STATUS));
+
+                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            File file = new File(
+                                    activity.getExternalFilesDir(
+                                            Environment.DIRECTORY_DOWNLOADS),
+                                    "Auren-Music-Player-" + version + ".apk");
+                            activity.runOnUiThread(() -> {
+                                if (file.exists() && file.length() > 0) {
+                                    install(activity, FileProvider.getUriForFile(
+                                            activity,
+                                            activity.getPackageName()
+                                                    + ".fileprovider",
+                                            file));
+                                } else {
+                                    showError(activity,
+                                            "APK da atualização não encontrado.");
+                                }
+                            });
+                            return;
+                        }
+
+                        if (status == DownloadManager.STATUS_FAILED) {
+                            activity.runOnUiThread(() -> showError(
+                                    activity,
+                                    "Não foi possível baixar a atualização."));
+                            return;
+                        }
+                    } finally {
+                        result.close();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (Exception ignored) {
+                }
+            }
+        }).start();
+    }
+
+    private static DownloadManager getManager(Activity activity) {
+        DownloadManager manager = (DownloadManager)
+                activity.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) {
+            showError(activity, "Não foi possível iniciar o download.");
+        }
+        return manager;
     }
 
     private static void install(Activity activity, Uri contentUri) {
@@ -223,6 +386,24 @@ public class UpdateManager {
             String name = asset.optString("name", "");
             if (name.toLowerCase().endsWith(".apk")) {
                 return asset.optString("browser_download_url", "");
+            }
+        }
+        return "";
+    }
+
+    private static String findPatch(
+            JSONArray assets,
+            String current,
+            String latest) {
+        if (assets == null) return "";
+        String expected = "Auren-Music-Player-"
+                + current + "-to-" + latest + ".patch";
+        for (int i = 0; i < assets.length(); i++) {
+            JSONObject asset = assets.optJSONObject(i);
+            if (asset == null) continue;
+            if (expected.equals(asset.optString("name", ""))) {
+                return asset.optString(
+                        "browser_download_url", "");
             }
         }
         return "";
