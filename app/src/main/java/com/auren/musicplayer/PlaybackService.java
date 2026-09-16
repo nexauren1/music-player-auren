@@ -18,6 +18,8 @@ public class PlaybackService extends Service {
             "com.auren.musicplayer.PREVIOUS";
     public static final String ACTION_STOP =
             "com.auren.musicplayer.STOP";
+    public static final String ACTION_UPDATE =
+            "com.auren.musicplayer.UPDATE";
 
     private static final String CHANNEL_ID = "auren_playback";
     private static final int NOTIFICATION_ID = 1001;
