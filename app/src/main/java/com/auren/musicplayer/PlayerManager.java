@@ -7,6 +7,7 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 
 public final class PlayerManager {
     public interface Listener {
@@ -80,12 +81,15 @@ public final class PlayerManager {
     }
 
     public static void play(Context context, Song song) {
-        if (context == null || song == null || song.uri == null) return;
+        if (context == null || song == null || song.uri == null) {
+            return;
+        }
 
         appContext = context.getApplicationContext();
         currentSong = song;
         preparing = true;
         releasePlayerOnly();
+        preparing = true;
         startPlaybackService();
         notifyChanged();
 
@@ -93,17 +97,32 @@ public final class PlayerManager {
             MediaPlayer newPlayer = new MediaPlayer();
             player = newPlayer;
             configureAudio(newPlayer);
+
+            if (Build.VERSION.SDK_INT >= 21) {
+                newPlayer.setWakeMode(
+                        appContext,
+                        PowerManager.PARTIAL_WAKE_LOCK);
+            }
+
             newPlayer.setDataSource(appContext, song.uri);
             newPlayer.setOnPreparedListener(mp -> {
-                if (mp != player) return;
+                if (mp != player) {
+                    return;
+                }
                 preparing = false;
-                mp.start();
+                try {
+                    mp.start();
+                } catch (Exception e) {
+                    releasePlayerOnly();
+                }
                 notifyChanged();
             });
+
             newPlayer.setOnCompletionListener(mp -> {
                 preparing = false;
                 handleCompletion();
             });
+
             newPlayer.setOnErrorListener((mp, what, extra) -> {
                 if (mp == player) {
                     preparing = false;
@@ -112,6 +131,7 @@ public final class PlayerManager {
                 }
                 return true;
             });
+
             newPlayer.prepareAsync();
         } catch (Exception e) {
             preparing = false;
@@ -150,6 +170,7 @@ public final class PlayerManager {
             }
             return;
         }
+
         try {
             if (player.isPlaying()) {
                 player.pause();
@@ -165,7 +186,9 @@ public final class PlayerManager {
     }
 
     public static void seekTo(int position) {
-        if (player == null || preparing) return;
+        if (player == null || preparing) {
+            return;
+        }
         try {
             player.seekTo(Math.max(0, position));
         } catch (Exception ignored) {
@@ -173,12 +196,19 @@ public final class PlayerManager {
     }
 
     public static void next(Context context, Song[] songs) {
+        if (context == null) {
+            return;
+        }
         Song[] source = songs == null ? queue : songs;
-        if (source.length == 0) return;
+        if (source.length == 0) {
+            return;
+        }
+
         appContext = context.getApplicationContext();
         queue = source.clone();
         int index = indexOf(source, currentSong);
         int next;
+
         if (shuffle && source.length > 1) {
             do {
                 next = (int) (Math.random() * source.length);
@@ -190,17 +220,26 @@ public final class PlayerManager {
     }
 
     public static void previous(Context context, Song[] songs) {
+        if (context == null) {
+            return;
+        }
         Song[] source = songs == null ? queue : songs;
-        if (source.length == 0) return;
+        if (source.length == 0) {
+            return;
+        }
+
         appContext = context.getApplicationContext();
         queue = source.clone();
         if (getPosition() > 3000) {
             seekTo(0);
             return;
         }
+
         int index = indexOf(source, currentSong);
         int previous = index - 1;
-        if (previous < 0) previous = source.length - 1;
+        if (previous < 0) {
+            previous = source.length - 1;
+        }
         play(appContext, source[previous]);
     }
 
@@ -223,18 +262,40 @@ public final class PlayerManager {
         MediaPlayer old = player;
         player = null;
         preparing = false;
+
         if (old != null) {
-            try { old.setOnPreparedListener(null); } catch (Exception ignored) { }
-            try { old.setOnCompletionListener(null); } catch (Exception ignored) { }
-            try { old.setOnErrorListener(null); } catch (Exception ignored) { }
-            try { old.stop(); } catch (Exception ignored) { }
-            try { old.reset(); } catch (Exception ignored) { }
-            try { old.release(); } catch (Exception ignored) { }
+            try {
+                old.setOnPreparedListener(null);
+            } catch (Exception ignored) {
+            }
+            try {
+                old.setOnCompletionListener(null);
+            } catch (Exception ignored) {
+            }
+            try {
+                old.setOnErrorListener(null);
+            } catch (Exception ignored) {
+            }
+            try {
+                old.stop();
+            } catch (Exception ignored) {
+            }
+            try {
+                old.reset();
+            } catch (Exception ignored) {
+            }
+            try {
+                old.release();
+            } catch (Exception ignored) {
+            }
         }
     }
 
     private static void startPlaybackService() {
-        if (appContext == null) return;
+        if (appContext == null) {
+            return;
+        }
+
         Intent intent = new Intent(appContext, PlaybackService.class);
         try {
             if (Build.VERSION.SDK_INT >= 26) {
@@ -247,9 +308,14 @@ public final class PlayerManager {
     }
 
     private static void notifyChanged() {
-        if (listener != null) listener.onPlayerChanged();
+        if (listener != null) {
+            listener.onPlayerChanged();
+        }
+
         if (appContext != null) {
-            Intent intent = new Intent(appContext, PlaybackService.class);
+            Intent intent = new Intent(
+                    appContext,
+                    PlaybackService.class);
             intent.setAction(PlaybackService.ACTION_UPDATE);
             try {
                 appContext.startService(intent);
@@ -259,9 +325,14 @@ public final class PlayerManager {
     }
 
     private static int indexOf(Song[] songs, Song song) {
-        if (song == null) return 0;
+        if (song == null) {
+            return 0;
+        }
         for (int i = 0; i < songs.length; i++) {
-            if (songs[i].uri.equals(song.uri)) return i;
+            if (songs[i] != null
+                    && songs[i].uri.equals(song.uri)) {
+                return i;
+            }
         }
         return 0;
     }
