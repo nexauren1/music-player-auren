@@ -32,13 +32,14 @@
                 android:resource="@xml/file_paths" />
         </provider>
         <activity
-            android:name=".AurenHomeV4Activity"
+            android:name=".AurenHomeV5Activity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".AurenHomeV4Activity" android:exported="false" />
         <activity android:name=".AurenHomeV3Activity" android:exported="false" />
         <activity android:name=".AurenHomeV2Activity" android:exported="false" />
         <activity android:name=".AurenHomeActivity" android:exported="false" />
