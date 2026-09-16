@@ -844,6 +844,7 @@ public class MainActivity extends ComponentActivity {
         player.prepare();
         player.play();
         updateMiniPlayer();
+        highlightPlayingTrack();
     }
 
     private void togglePlayback() {
@@ -851,6 +852,36 @@ public class MainActivity extends ComponentActivity {
         if (player.isPlaying()) player.pause();
         else if (player.getMediaItemCount() > 0) player.play();
         updateMiniPlayer();
+    }
+
+    private void highlightPlayingTrack() {
+        if (pageContainer == null) return;
+        updatePlayingViews(pageContainer);
+    }
+
+    private void updatePlayingViews(View view) {
+        Object tag = view.getTag();
+        if (tag instanceof Long) {
+            boolean playing = currentTrack != null && ((Long) tag) == currentTrack.id;
+            view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                    getColor(playing ? R.color.playing_background : R.color.card)));
+            if (view instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) view;
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    View child = group.getChildAt(i);
+                    if (child instanceof TextView) {
+                        TextView tv = (TextView) child;
+                        tv.setTextColor(getColor(playing ? R.color.playing_text : R.color.text_primary));
+                    }
+                }
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                updatePlayingViews(group.getChildAt(i));
+            }
+        }
     }
 
     private void updateMiniPlayer() {
@@ -958,13 +989,14 @@ public class MainActivity extends ComponentActivity {
         TextView artist = text(safeArtist(track), 11, R.color.text_secondary);
         artist.setMaxLines(1);
         card.addView(artist, margins(2, 1, 2, 0));
-        card.setOnClickListener(v -> { play(track); openNowPlaying(); });
+        card.setOnClickListener(v -> play(track));
         return card;
     }
     private View trackRow(Track track, int number) {
         LinearLayout row = rounded(0xFFFFFFFF, 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
+        row.setTag(track.id);
 
         ImageView art = artwork(48);
         art.setImageURI(track.albumArtUri());
@@ -1000,7 +1032,7 @@ public class MainActivity extends ComponentActivity {
         overflow.setOnClickListener(v -> showTrackMenu(v, track));
         row.addView(overflow, new LinearLayout.LayoutParams(dp(46), dp(48)));
 
-        row.setOnClickListener(v -> { play(track); openNowPlaying(); });
+        row.setOnClickListener(v -> play(track));
         return row;
     }
 
