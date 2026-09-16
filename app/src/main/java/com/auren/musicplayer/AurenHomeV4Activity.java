@@ -20,6 +20,8 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.View;
+import android.view.Window;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -40,11 +42,15 @@ import java.util.concurrent.Executors;
 public class AurenHomeV4Activity extends Activity implements PlayerManager.Listener {
     private static final int REQUEST_AUDIO = 200;
     private static final int REQUEST_NOTIFICATIONS = 201;
-    private static final int GREEN = Color.rgb(26, 142, 55);
-    private static final int BG = Color.rgb(246, 248, 247);
+
+    private static final int GREEN = Color.rgb(24, 139, 58);
+    private static final int GREEN_DARK = Color.rgb(13, 91, 39);
+    private static final int GREEN_SOFT = Color.rgb(232, 246, 236);
+    private static final int BG = Color.rgb(247, 249, 248);
     private static final int CARD = Color.WHITE;
-    private static final int TEXT = Color.rgb(24, 28, 26);
-    private static final int MUTED = Color.rgb(103, 111, 106);
+    private static final int TEXT = Color.rgb(24, 30, 26);
+    private static final int MUTED = Color.rgb(101, 111, 105);
+    private static final int BORDER = Color.rgb(226, 232, 228);
 
     private final List<PlayerManager.Song> songs = new ArrayList<>();
     private final List<PlayerManager.Song> visible = new ArrayList<>();
@@ -54,17 +60,20 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
 
     private SharedPreferences prefs;
     private LinearLayout content;
+    private LinearLayout miniContainer;
     private ImageView miniArtwork;
     private TextView miniTitle;
     private TextView miniArtist;
     private TextView miniPlay;
     private EditText search;
+    private TextView libraryStatus;
     private String selectedTab = "Músicas";
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("auren", MODE_PRIVATE);
+        styleSystemBars();
         buildUi();
         PlayerManager.setListener(this);
         requestAudioPermission();
@@ -85,34 +94,63 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         super.onDestroy();
     }
 
+    private void styleSystemBars() {
+        Window window = getWindow();
+        window.setStatusBarColor(GREEN_DARK);
+        window.setNavigationBarColor(Color.WHITE);
+        if (Build.VERSION.SDK_INT >= 26) {
+            window.getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
+    }
+
     private void buildUi() {
         LinearLayout root = column(BG);
-        root.setFitsSystemWindows(true);
 
         LinearLayout header = column(GREEN);
-        header.setPadding(dp(18), dp(18), dp(18), dp(14));
+        header.setPadding(dp(18), dp(14), dp(18), dp(18));
 
-        LinearLayout top = row();
+        LinearLayout top = row(GREEN);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
         TextView menu = action("☰", Color.WHITE, 25);
         top.addView(menu, size(48, 48));
 
-        TextView brand = text("AUREN", 22, Color.WHITE);
+        LinearLayout brandBox = column(GREEN);
+        brandBox.setGravity(Gravity.CENTER_VERTICAL);
+        TextView brand = text("AUREN", 21, Color.WHITE);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        top.addView(brand, weight(1, 48));
+        TextView brandSub = text("MUSIC PLAYER", 9, Color.rgb(211, 239, 219));
+        brandSub.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        brandBox.addView(brand);
+        brandBox.addView(brandSub);
+        top.addView(brandBox, weight(1, 48));
 
-        TextView settings = action("⚙", Color.WHITE, 23);
+        TextView settings = action("⚙", Color.WHITE, 24);
         top.addView(settings, size(48, 48));
         header.addView(top);
 
-        TextView welcome = text("A tua música, do teu jeito.", 26, Color.WHITE);
+        TextView welcome = text("A tua música.", 29, Color.WHITE);
         welcome.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        welcome.setPadding(0, dp(12), 0, dp(2));
-        header.addView(welcome);
+        LinearLayout.LayoutParams welcomeParams = size(-1, 42);
+        welcomeParams.topMargin = dp(18);
+        header.addView(welcome, welcomeParams);
 
         TextView subtitle = text(
-                "Biblioteca local • simples • rápida",
-                13, Color.rgb(221, 244, 226));
-        header.addView(subtitle);
+                "Tudo o que tens no teu dispositivo, num só lugar.",
+                14, Color.rgb(220, 243, 226));
+        header.addView(subtitle, size(-1, 28));
+
+        LinearLayout searchBox = row(Color.WHITE);
+        searchBox.setGravity(Gravity.CENTER_VERTICAL);
+        searchBox.setPadding(dp(14), 0, dp(8), 0);
+        searchBox.setBackground(round(Color.WHITE, 18));
+        LinearLayout.LayoutParams searchBoxParams = size(-1, 54);
+        searchBoxParams.topMargin = dp(14);
+        header.addView(searchBox, searchBoxParams);
+
+        TextView searchIcon = action("⌕", GREEN, 24);
+        searchBox.addView(searchIcon, size(34, 50));
 
         search = new EditText(this);
         search.setSingleLine(true);
@@ -120,11 +158,9 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         search.setTextSize(14);
         search.setTextColor(TEXT);
         search.setHintTextColor(MUTED);
-        search.setPadding(dp(16), 0, dp(16), 0);
-        search.setBackground(round(Color.WHITE, 18));
-        LinearLayout.LayoutParams searchParams = size(-1, 50);
-        searchParams.topMargin = dp(16);
-        header.addView(search, searchParams);
+        search.setBackgroundColor(Color.TRANSPARENT);
+        search.setPadding(dp(5), 0, dp(8), 0);
+        searchBox.addView(search, weight(1, 50));
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(
                     CharSequence s, int st, int c, int a) {
@@ -142,22 +178,23 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         root.addView(header);
 
         LinearLayout tabs = row(BG);
-        tabs.setPadding(dp(14), dp(12), dp(14), dp(8));
+        tabs.setPadding(dp(16), dp(12), dp(16), dp(8));
         renderTabs(tabs);
         root.addView(tabs);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         content = column(BG);
-        content.setPadding(dp(16), dp(4), dp(16), dp(118));
+        content.setPadding(dp(16), dp(4), dp(16), dp(28));
         scroll.addView(content);
         root.addView(scroll, weight(1, 0));
 
-        LinearLayout mini = buildMiniPlayer();
-        root.addView(mini);
+        miniContainer = buildMiniPlayer();
+        root.addView(miniContainer);
 
         menu.setOnClickListener(v -> showMenu());
         settings.setOnClickListener(v -> openSettings());
+
         setContentView(root);
         renderLibrary();
         updateMiniPlayer();
@@ -167,19 +204,20 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         tabs.removeAllViews();
         String[] names = {"Músicas", "Favoritos", "Recentes"};
         for (String name : names) {
-            TextView tab = text(
-                    name, 13,
-                    name.equals(selectedTab) ? Color.WHITE : TEXT);
+            boolean selected = name.equals(selectedTab);
+            TextView tab = text(name, 13, selected ? Color.WHITE : TEXT);
             tab.setGravity(Gravity.CENTER);
             tab.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            tab.setBackground(round(
-                    name.equals(selectedTab) ? GREEN : CARD, 18));
+            tab.setBackground(round(selected ? GREEN : CARD, 16));
+            LinearLayout.LayoutParams params = weight(1, 44);
+            params.leftMargin = dp(3);
+            params.rightMargin = dp(3);
+            tabs.addView(tab, params);
             tab.setOnClickListener(v -> {
                 selectedTab = name;
                 renderTabs(tabs);
                 renderLibrary();
             });
-            tabs.addView(tab, weight(1, 42));
         }
     }
 
@@ -199,35 +237,39 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         if (selectedTab.equals("Recentes")) {
             for (String uri : recent) {
                 PlayerManager.Song song = findSong(uri);
-                if (song != null && matches(song, query)) {
-                    visible.add(song);
-                }
+                if (song != null && matches(song, query)) visible.add(song);
             }
         } else {
             for (PlayerManager.Song song : songs) {
                 if (!matches(song, query)) continue;
                 if (selectedTab.equals("Favoritos")
-                        && !favorites.contains(song.uri.toString())) {
-                    continue;
-                }
+                        && !favorites.contains(song.uri.toString())) continue;
                 visible.add(song);
             }
         }
 
+        LinearLayout headingRow = row(BG);
         TextView title = text(selectedTab, 22, TEXT);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        content.addView(title, size(-1, 34));
+        headingRow.addView(title, weight(1, 34));
 
-        TextView count = text(
-                visible.size() + (visible.size() == 1
-                        ? " música" : " músicas"),
+        libraryStatus = text(
+                visible.size() + (visible.size() == 1 ? " música" : " músicas"),
                 12, MUTED);
-        content.addView(count, size(-1, 24));
+        libraryStatus.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        headingRow.addView(libraryStatus, size(110, 34));
+        content.addView(headingRow);
+
+        if (!hasAudioPermission()) {
+            addPermissionCard();
+            return;
+        }
 
         if (songs.isEmpty()) {
             addEmpty(
-                    "A tua biblioteca está vazia",
-                    "Permite o acesso às músicas do dispositivo para começar.");
+                    "A biblioteca está vazia",
+                    "Não encontrámos músicas neste dispositivo.",
+                    true);
             return;
         }
 
@@ -238,13 +280,43 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
             String message = selectedTab.equals("Recentes")
                     ? "As músicas que reproduzires aparecerão aqui."
                     : "Experimenta outro nome de música, artista ou álbum.";
-            addEmpty(heading, message);
+            addEmpty(heading, message, false);
             return;
         }
 
         for (PlayerManager.Song song : visible) {
             addSongCard(song, favorites.contains(song.uri.toString()));
         }
+    }
+
+    private void addPermissionCard() {
+        LinearLayout card = card();
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(dp(22), dp(24), dp(22), dp(24));
+
+        TextView icon = text("♫", 38, GREEN);
+        icon.setGravity(Gravity.CENTER);
+        card.addView(icon, size(-1, 50));
+
+        TextView title = text("Dá acesso à tua música", 19, TEXT);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        card.addView(title, size(-1, 30));
+
+        TextView message = text(
+                "O Auren precisa de permissão para mostrar as músicas guardadas no telemóvel.",
+                13, MUTED);
+        message.setGravity(Gravity.CENTER);
+        message.setPadding(0, dp(4), 0, dp(14));
+        card.addView(message, size(-1, 52));
+
+        TextView button = action("Permitir acesso", Color.WHITE, 14);
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setBackground(round(GREEN, 16));
+        card.addView(button, size(170, 48));
+        button.setOnClickListener(v -> requestAudioPermission());
+
+        content.addView(card, size(-1, 225));
     }
 
     private boolean matches(PlayerManager.Song song, String query) {
@@ -262,28 +334,27 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         card.setElevation(dp(1));
 
         LinearLayout.LayoutParams cp = size(-1, 76);
-        cp.bottomMargin = dp(8);
+        cp.bottomMargin = dp(9);
         content.addView(card, cp);
 
         ImageView cover = new ImageView(this);
         cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
         cover.setImageResource(android.R.drawable.ic_media_play);
         cover.setColorFilter(GREEN);
-        cover.setBackground(round(Color.rgb(235, 241, 236), 14));
+        cover.setBackground(round(Color.rgb(235, 243, 237), 14));
         cover.setTag(song.uri.toString());
         card.addView(cover, size(58, 58));
 
         LinearLayout info = column(CARD);
         info.setGravity(Gravity.CENTER_VERTICAL);
-        info.setPadding(dp(12), 0, dp(5), 0);
+        info.setPadding(dp(12), 0, dp(4), 0);
 
         TextView name = text(song.title, 15, TEXT);
         name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         name.setMaxLines(1);
         name.setEllipsize(TextUtils.TruncateAt.END);
 
-        TextView meta = text(
-                song.artist + " • " + song.album, 12, MUTED);
+        TextView meta = text(song.artist + "  ·  " + song.album, 12, MUTED);
         meta.setMaxLines(1);
         meta.setEllipsize(TextUtils.TruncateAt.END);
 
@@ -292,14 +363,13 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         card.addView(info, weight(1, 58));
 
         TextView heart = action(
-                favorite ? "♥" : "♡",
-                favorite ? GREEN : MUTED, 22);
+                favorite ? "♥" : "♡", favorite ? GREEN : MUTED, 22);
         heart.setOnClickListener(v -> toggleFavorite(song));
-        card.addView(heart, size(44, 52));
+        card.addView(heart, size(42, 52));
 
         TextView more = action("⋮", MUTED, 24);
         more.setOnClickListener(v -> showSongMenu(song));
-        card.addView(more, size(38, 52));
+        card.addView(more, size(34, 52));
 
         card.setOnClickListener(v -> playSong(song));
         loadArtwork(song, cover);
@@ -308,13 +378,15 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     private LinearLayout buildMiniPlayer() {
         LinearLayout mini = row(CARD);
         mini.setGravity(Gravity.CENTER_VERTICAL);
-        mini.setPadding(dp(10), dp(7), dp(8), dp(7));
-        mini.setElevation(dp(10));
+        mini.setPadding(dp(12), dp(8), dp(10), dp(8));
+        mini.setElevation(dp(8));
+        mini.setBackground(round(CARD, 18));
 
         miniArtwork = new ImageView(this);
         miniArtwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
         miniArtwork.setImageResource(android.R.drawable.ic_media_play);
         miniArtwork.setColorFilter(GREEN);
+        miniArtwork.setBackground(round(GREEN_SOFT, 14));
         mini.addView(miniArtwork, size(48, 48));
 
         LinearLayout info = column(CARD);
@@ -329,31 +401,29 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
         miniArtist = text("Escolhe uma música", 11, MUTED);
         miniArtist.setMaxLines(1);
         miniArtist.setEllipsize(TextUtils.TruncateAt.END);
-
         info.addView(miniTitle);
         info.addView(miniArtist);
         mini.addView(info, weight(1, 48));
 
-        miniPlay = action("▶", GREEN, 23);
-        mini.addView(miniPlay, size(52, 52));
+        miniPlay = action("▶", GREEN, 22);
+        mini.addView(miniPlay, size(50, 50));
         miniPlay.setOnClickListener(v -> PlayerManager.toggle());
 
-        TextView open = action("⌃", MUTED, 20);
-        mini.addView(open, size(38, 52));
+        TextView open = action("⌃", MUTED, 19);
+        mini.addView(open, size(34, 50));
         open.setOnClickListener(v -> openPlayer());
         mini.setOnClickListener(v -> openPlayer());
         return mini;
     }
 
     private void updateMiniPlayer() {
-        if (miniTitle == null) return;
+        if (miniContainer == null || miniTitle == null) return;
         PlayerManager.Song song = PlayerManager.getCurrentSong();
         if (song == null) {
-            miniTitle.setText("Nada a tocar");
-            miniArtist.setText("Escolhe uma música");
-            miniPlay.setText("▶");
+            miniContainer.setVisibility(View.GONE);
             return;
         }
+        miniContainer.setVisibility(View.VISIBLE);
         miniTitle.setText(song.title);
         miniArtist.setText(song.artist);
         miniPlay.setText(PlayerManager.isPlaying() ? "Ⅱ" : "▶");
@@ -400,10 +470,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
 
     private void openPlayer() {
         if (PlayerManager.getCurrentSong() == null) {
-            Toast.makeText(
-                    this,
-                    "Escolhe uma música primeiro.",
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Escolhe uma música primeiro.", Toast.LENGTH_SHORT).show();
             return;
         }
         startActivity(new Intent(this, PlayerActivity.class));
@@ -418,21 +485,54 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     }
 
     private void showMenu() {
-        final String[] items = {
-                "Player",
-                "Efeitos de áudio",
-                "Definições",
-                "Atualizar biblioteca"
-        };
-        new AlertDialog.Builder(this)
-                .setTitle("AUREN")
-                .setItems(items, (d, which) -> {
-                    if (which == 0) openPlayer();
-                    else if (which == 1) openEffects();
-                    else if (which == 2) openSettings();
-                    else loadSongs();
-                })
-                .show();
+        LinearLayout menu = column(CARD);
+        menu.setPadding(dp(18), dp(8), dp(18), dp(12));
+
+        TextView heading = text("AUREN", 22, TEXT);
+        heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        menu.addView(heading, size(-1, 38));
+
+        TextView sub = text("O teu espaço de música", 12, MUTED);
+        menu.addView(sub, size(-1, 26));
+
+        addMenuItem(menu, "▶", "Player", "Abrir o leitor", this::openPlayer);
+        addMenuItem(menu, "♫", "Efeitos de áudio", "Equalizador e graves", this::openEffects);
+        addMenuItem(menu, "⚙", "Definições", "Aparência, biblioteca e atualizações", this::openSettings);
+        addMenuItem(menu, "↻", "Atualizar biblioteca", "Procurar músicas novamente", this::loadSongs);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(menu)
+                .setNegativeButton("Fechar", null)
+                .create();
+        dialog.show();
+    }
+
+    private void addMenuItem(
+            LinearLayout parent,
+            String icon,
+            String title,
+            String subtitle,
+            final Runnable action) {
+        LinearLayout item = row(CARD);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(0, dp(5), 0, dp(5));
+
+        TextView iconView = action(icon, GREEN, 21);
+        iconView.setBackground(round(GREEN_SOFT, 14));
+        item.addView(iconView, size(48, 48));
+
+        LinearLayout info = column(CARD);
+        info.setGravity(Gravity.CENTER_VERTICAL);
+        info.setPadding(dp(12), 0, 0, 0);
+        TextView titleView = text(title, 15, TEXT);
+        titleView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView subtitleView = text(subtitle, 11, MUTED);
+        info.addView(titleView);
+        info.addView(subtitleView);
+        item.addView(info, weight(1, 48));
+        parent.addView(item, size(-1, 58));
+
+        item.setOnClickListener(v -> action.run());
     }
 
     private void showSongMenu(PlayerManager.Song song) {
@@ -467,42 +567,50 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     }
 
     private Set<String> favorites() {
-        return new HashSet<>(prefs.getStringSet(
-                "favorites", new HashSet<>()));
+        return new HashSet<>(prefs.getStringSet("favorites", new HashSet<>()));
     }
 
-    private void addEmpty(String heading, String message) {
-        LinearLayout box = column(CARD);
+    private void addEmpty(String heading, String message, boolean refresh) {
+        LinearLayout box = card();
         box.setGravity(Gravity.CENTER);
-        box.setPadding(dp(24), dp(30), dp(24), dp(30));
-        box.setBackground(round(CARD, 22));
+        box.setPadding(dp(24), dp(22), dp(24), dp(22));
 
-        TextView icon = text("♪", 38, GREEN);
+        TextView icon = text("♫", 36, GREEN);
         icon.setGravity(Gravity.CENTER);
-        box.addView(icon, size(-1, 50));
+        box.addView(icon, size(-1, 48));
 
         TextView title = text(heading, 18, TEXT);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
-        box.addView(title);
+        box.addView(title, size(-1, 30));
 
         TextView msg = text(message, 13, MUTED);
         msg.setGravity(Gravity.CENTER);
-        box.addView(msg);
+        box.addView(msg, size(-1, 44));
 
-        if (!hasAudioPermission()) {
-            TextView grant = action(
-                    "Permitir acesso às músicas", GREEN, 13);
-            grant.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            grant.setPadding(0, dp(14), 0, 0);
-            grant.setOnClickListener(v -> requestAudioPermission());
-            box.addView(grant);
+        if (refresh) {
+            TextView button = action("Atualizar biblioteca", Color.WHITE, 13);
+            button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            button.setBackground(round(GREEN, 15));
+            box.addView(button, size(180, 46));
+            button.setOnClickListener(v -> loadSongs());
         }
-        content.addView(box, size(-1, 190));
+
+        content.addView(box, size(-1, refresh ? 205 : 180));
+    }
+
+    private LinearLayout card() {
+        LinearLayout value = column(CARD);
+        value.setBackground(round(CARD, 20));
+        value.setElevation(dp(1));
+        return value;
     }
 
     private void loadSongs() {
-        if (!hasAudioPermission()) return;
+        if (!hasAudioPermission()) {
+            renderLibrary();
+            return;
+        }
 
         songs.clear();
         String[] projection = {
@@ -511,60 +619,50 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.ALBUM,
                 MediaStore.Audio.Media.DURATION,
+                MediaStore.Audio.Media.IS_MUSIC,
                 MediaStore.Audio.Media.MIME_TYPE
         };
-
-        String selection = MediaStore.Audio.Media.IS_MUSIC
-                + " != 0 OR "
-                + MediaStore.Audio.Media.MIME_TYPE + " LIKE ?";
-        String[] selectionArgs = {"audio/%"};
 
         try (Cursor cursor = getContentResolver().query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 projection,
-                selection,
-                selectionArgs,
-                MediaStore.Audio.Media.TITLE
-                        + " COLLATE NOCASE ASC")) {
+                MediaStore.Audio.Media.IS_MUSIC + " != 0",
+                null,
+                MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
             if (cursor == null) {
-                showLibraryError(
-                        "Não foi possível ler a biblioteca de música.");
+                showLibraryError("Não foi possível ler a biblioteca.");
                 return;
             }
 
-            int id = cursor.getColumnIndexOrThrow(
-                    MediaStore.Audio.Media._ID);
-            int title = cursor.getColumnIndexOrThrow(
-                    MediaStore.Audio.Media.TITLE);
-            int artist = cursor.getColumnIndexOrThrow(
-                    MediaStore.Audio.Media.ARTIST);
-            int album = cursor.getColumnIndexOrThrow(
-                    MediaStore.Audio.Media.ALBUM);
-            int duration = cursor.getColumnIndexOrThrow(
-                    MediaStore.Audio.Media.DURATION);
+            int id = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID);
+            int title = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE);
+            int artist = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST);
+            int album = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM);
+            int duration = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION);
 
             while (cursor.moveToNext()) {
                 long songId = cursor.getLong(id);
                 Uri uri = Uri.withAppendedPath(
                         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                         String.valueOf(songId));
+                long length = cursor.getLong(duration);
+                if (length <= 0) continue;
                 songs.add(new PlayerManager.Song(
                         safe(cursor.getString(title), "Sem título"),
-                        safe(cursor.getString(artist),
-                                "Artista desconhecido"),
-                        safe(cursor.getString(album),
-                                "Álbum desconhecido"),
-                        cursor.getLong(duration),
+                        safe(cursor.getString(artist), "Artista desconhecido"),
+                        safe(cursor.getString(album), "Álbum desconhecido"),
+                        length,
                         uri));
             }
         } catch (SecurityException e) {
             showLibraryError("O acesso às músicas foi recusado.");
+            return;
         } catch (Exception e) {
             showLibraryError("Não foi possível carregar as músicas.");
+            return;
         }
 
-        PlayerManager.setQueue(
-                songs.toArray(new PlayerManager.Song[0]));
+        PlayerManager.setQueue(songs.toArray(new PlayerManager.Song[0]));
         renderLibrary();
     }
 
@@ -578,8 +676,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 ? Manifest.permission.READ_MEDIA_AUDIO
                 : Manifest.permission.READ_EXTERNAL_STORAGE;
         return Build.VERSION.SDK_INT < 23
-                || checkSelfPermission(permission)
-                == PackageManager.PERMISSION_GRANTED;
+                || checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestAudioPermission() {
@@ -587,10 +684,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 ? Manifest.permission.READ_MEDIA_AUDIO
                 : Manifest.permission.READ_EXTERNAL_STORAGE;
         if (Build.VERSION.SDK_INT >= 23
-                && checkSelfPermission(permission)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                    new String[]{permission}, REQUEST_AUDIO);
+                && checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{permission}, REQUEST_AUDIO);
         } else {
             loadSongs();
         }
@@ -611,15 +706,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
             int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == REQUEST_AUDIO) {
-            if (hasAudioPermission()) {
-                loadSongs();
-            } else {
-                renderLibrary();
-                Toast.makeText(
-                        this,
-                        "Permissão de música necessária para mostrar a biblioteca.",
-                        Toast.LENGTH_LONG).show();
-            }
+            if (hasAudioPermission()) loadSongs();
+            else renderLibrary();
         }
     }
 
@@ -638,8 +726,8 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
             if (bitmap == null) return;
             artworkCache.put(key, bitmap);
             runOnUiThread(() -> {
-                if (view == miniArtwork
-                        || key.equals(view.getTag())) {
+                if (!isFinishing()
+                        && (view == miniArtwork || key.equals(view.getTag()))) {
                     view.setImageBitmap(bitmap);
                     view.clearColorFilter();
                 }
@@ -648,14 +736,12 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     }
 
     private Bitmap extractArtwork(Uri uri) {
-        MediaMetadataRetriever retriever =
-                new MediaMetadataRetriever();
+        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
             retriever.setDataSource(this, uri);
             byte[] data = retriever.getEmbeddedPicture();
             if (data == null) return null;
-            Bitmap bitmap = BitmapFactory.decodeByteArray(
-                    data, 0, data.length);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
             if (bitmap == null) return null;
             return Bitmap.createScaledBitmap(bitmap, 300, 300, true);
         } catch (Exception ignored) {
@@ -675,12 +761,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
 
     @Override
     public void onPlayerError(String message) {
-        runOnUiThread(() -> Toast.makeText(
-                this, message, Toast.LENGTH_LONG).show());
-    }
-
-    private LinearLayout row() {
-        return row(BG);
+        runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
     }
 
     private LinearLayout row(int color) {
@@ -713,10 +794,9 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     }
 
     private LinearLayout.LayoutParams size(int width, int height) {
-        int resolvedWidth = width < 0 ? width : dp(width);
-        int resolvedHeight = height < 0 ? height : dp(height);
         return new LinearLayout.LayoutParams(
-                resolvedWidth, resolvedHeight);
+                width < 0 ? width : dp(width),
+                height < 0 ? height : dp(height));
     }
 
     private LinearLayout.LayoutParams weight(float weight, int height) {
@@ -724,8 +804,7 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
                 0, height < 0 ? height : dp(height), weight);
     }
 
-    private android.graphics.drawable.GradientDrawable round(
-            int color, int radius) {
+    private android.graphics.drawable.GradientDrawable round(int color, int radius) {
         android.graphics.drawable.GradientDrawable drawable =
                 new android.graphics.drawable.GradientDrawable();
         drawable.setColor(color);
@@ -734,12 +813,10 @@ public class AurenHomeV4Activity extends Activity implements PlayerManager.Liste
     }
 
     private int dp(int value) {
-        return (int) (value
-                * getResources().getDisplayMetrics().density + 0.5f);
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private String safe(String value, String fallback) {
-        return value == null || value.trim().isEmpty()
-                ? fallback : value;
+        return value == null || value.trim().isEmpty() ? fallback : value;
     }
 }
