@@ -32,6 +32,46 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Automatic version bump
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -e
+
+          VERSION=$(sed -n "s/.*versionName ['\"]\([^'\"]*\)['\"].*/\1/p" \
+            app/build.gradle | head -n 1)
+
+          if [ -z "$VERSION" ]; then
+            echo "Could not read versionName"
+            exit 1
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          MAJOR=${MAJOR:-1}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+
+          CURRENT_CODE=$(sed -n "s/.*versionCode[[:space:]]\+\([0-9]\+\).*/\1/p" \
+            app/build.gradle | head -n 1)
+          CURRENT_CODE=${CURRENT_CODE:-1}
+          NEXT_CODE=$((CURRENT_CODE + 1))
+
+          sed -i -E "0,/versionCode[[:space:]]+[0-9]+/s//versionCode $NEXT_CODE/" \
+            app/build.gradle
+          sed -i -E "0,/versionName[[:space:]]+['\"][^'\"]+['\"]/s//versionName '$NEXT_VERSION'/" \
+            app/build.gradle
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add app/build.gradle
+          git commit -m "chore: bump Auren version to $NEXT_VERSION [skip ci]"
+          git push
+
+          echo "Version: $VERSION -> $NEXT_VERSION"
+          echo "Version code: $CURRENT_CODE -> $NEXT_CODE"
+
       - name: Prepare release signing
         shell: bash
         env:
