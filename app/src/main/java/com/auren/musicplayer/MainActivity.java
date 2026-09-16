@@ -431,29 +431,87 @@ public class MainActivity extends ComponentActivity {
         playlistTab.setTextColor(getColor(R.color.text_secondary));
         active.setTextColor(getColor(R.color.auren_primary));
     }
-
     private void showAppMenu(View anchor) {
-        PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Início");
-        menu.getMenu().add("Biblioteca");
-        menu.getMenu().add("Favoritos");
-        menu.getMenu().add("Playlists");
-        menu.getMenu().add("Mais tocadas");
-        menu.getMenu().add("Configurações");
-        menu.getMenu().add("Sobre Auren");
-        menu.setOnMenuItemClickListener(item -> {
-            String title = item.getTitle().toString();
-            if (title.equals("Início")) showHome();
-            else if (title.equals("Biblioteca")) showLibrary();
-            else if (title.equals("Favoritos")) showLibrary(true);
-            else if (title.equals("Playlists")) showPlaylists();
-            else if (title.equals("Mais tocadas")) showMostPlayed();
-            else if (title.equals("Configurações")) startActivity(new Intent(this, SettingsActivity.class));
-            else if (title.equals("Sobre Auren")) showAboutDialog();
-            return true;
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout root = column();
+        root.setBackgroundColor(getColor(R.color.surface));
+
+        LinearLayout header = column();
+        header.setPadding(dp(20), dp(28), dp(20), dp(20));
+        header.setBackgroundColor(getColor(R.color.auren_primary));
+
+        TextView brand = text("AUREN", 25, android.R.color.white);
+        brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        header.addView(brand);
+        TextView subtitle = text("Music Player", 13, android.R.color.white);
+        header.addView(subtitle, margins(0, 2, 0, 0));
+        TextView version = text("Versão " + BuildConfig.VERSION_NAME, 11, android.R.color.white);
+        header.addView(version, margins(0, 12, 0, 0));
+        root.addView(header);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout items = column();
+        items.setPadding(dp(10), dp(12), dp(10), dp(16));
+
+        addDrawerItem(items, "⌂", "Início", () -> { dialog.dismiss(); showHome(); });
+        addDrawerItem(items, "♫", "Biblioteca", () -> { dialog.dismiss(); showLibrary(); });
+        addDrawerItem(items, "♥", "Favoritos", () -> { dialog.dismiss(); showLibrary(true); });
+        addDrawerItem(items, "▤", "Playlists", () -> { dialog.dismiss(); showPlaylists(); });
+        addDrawerItem(items, "🔥", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
+        addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
+        addDrawerItem(items, "✦", "Sugestões", () -> { dialog.dismiss(); showSuggestions(); });
+
+        View divider = new View(this);
+        divider.setBackgroundColor(0xFFE4E8EF);
+        items.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+
+        addDrawerItem(items, "⚙", "Configurações", () -> {
+            dialog.dismiss();
+            startActivity(new Intent(this, SettingsActivity.class));
         });
-        menu.show();
+        addDrawerItem(items, "ⓘ", "Sobre Auren", () -> { dialog.dismiss(); showAboutDialog(); });
+
+        scroll.addView(items);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        dialog.setContentView(root);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.show();
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setDimAmount(0.28f);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setGravity(Gravity.START | Gravity.TOP);
+            window.setLayout(
+                    Math.min(dp(330), getResources().getDisplayMetrics().widthPixels - dp(24)),
+                    -1
+            );
+        }
     }
+
+    private void addDrawerItem(LinearLayout parent, String icon, String label, Runnable action) {
+        LinearLayout item = row();
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(dp(14), dp(8), dp(12), dp(8));
+        item.setBackground(roundDrawable(Color.WHITE, 16));
+
+        TextView iconView = text(icon, 22, R.color.text_secondary);
+        iconView.setGravity(Gravity.CENTER);
+        item.addView(iconView, new LinearLayout.LayoutParams(dp(48), dp(50)));
+
+        TextView name = text(label, 15, R.color.text_primary);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        item.addView(name, new LinearLayout.LayoutParams(0, dp(50), 1));
+
+        TextView arrow = text("›", 25, R.color.text_secondary);
+        item.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(50)));
+        item.setOnClickListener(v -> action.run());
+        parent.addView(item, margins(0, 3, 0, 3));
+    }
+
 
     private void showAboutDialog() {
         new AlertDialog.Builder(this)
