@@ -9,7 +9,9 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 
 public class PlaybackService extends Service {
     public static final String ACTION_PLAY_PAUSE =
@@ -25,6 +27,20 @@ public class PlaybackService extends Service {
 
     private static final String CHANNEL_ID = "auren_playback";
     private static final int NOTIFICATION_ID = 1001;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private Bitmap cachedArtwork;
+    private String cachedArtworkUri;
+
+    private final Runnable progressUpdater = new Runnable() {
+        @Override
+        public void run() {
+            if (PlayerManager.isPlaying()) {
+                updateNotification();
+                handler.postDelayed(this, 1000);
+            }
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -45,12 +61,14 @@ public class PlaybackService extends Service {
                 PlayerManager.previous(this, PlayerManager.getQueue());
             } else if (ACTION_STOP.equals(action)) {
                 PlayerManager.release();
+                stopProgressUpdates();
                 stopForeground(STOP_FOREGROUND_REMOVE);
                 stopSelf();
                 return START_NOT_STICKY;
             }
         }
         updateNotification();
+        updateProgressLoop();
         return START_NOT_STICKY;
     }
 
@@ -74,13 +92,24 @@ public class PlaybackService extends Service {
         }
     }
 
+    private void updateProgressLoop() {
+        stopProgressUpdates();
+        if (PlayerManager.isPlaying()) {
+            handler.postDelayed(progressUpdater, 1000);
+        }
+    }
+
+    private void stopProgressUpdates() {
+        handler.removeCallbacks(progressUpdater);
+    }
+
     private Notification buildNotification() {
         PlayerManager.Song song = PlayerManager.getCurrentSong();
         String title = song == null ? "Auren Music Player" : song.title;
         String artist = song == null ? "Nenhuma música" : song.artist;
         int position = PlayerManager.getPosition();
         int duration = PlayerManager.getDuration();
-        Bitmap artwork = PlayerManager.getCurrentArtwork();
+        Bitmap artwork = getArtwork(song);
 
         PendingIntent previous = action(ACTION_PREVIOUS, 10);
         PendingIntent playPause = action(ACTION_PLAY_PAUSE, 11);
@@ -100,7 +129,8 @@ public class PlaybackService extends Service {
         builder.setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(title)
                 .setContentText(artist)
-                .setSubText(formatTime(position) + " / " + formatTime(duration))
+                .setSubText(formatTime(position) + " / "
+                        + formatTime(duration))
                 .setContentIntent(content)
                 .setOngoing(PlayerManager.isPlaying())
                 .setOnlyAlertOnce(true)
@@ -134,6 +164,19 @@ public class PlaybackService extends Service {
         }
 
         return builder.build();
+    }
+
+    private Bitmap getArtwork(PlayerManager.Song song) {
+        if (song == null || song.uri == null) {
+            cachedArtwork = null;
+            cachedArtworkUri = null;
+            return null;
+        }
+        String uri = song.uri.toString();
+        if (uri.equals(cachedArtworkUri)) return cachedArtwork;
+        cachedArtworkUri = uri;
+        cachedArtwork = PlayerManager.getCurrentArtwork();
+        return cachedArtwork;
     }
 
     private String formatTime(int millis) {
@@ -179,7 +222,10 @@ public class PlaybackService extends Service {
 
     @Override
     public void onDestroy() {
+        stopProgressUpdates();
         PlayerManager.release();
+        if (cachedArtwork != null) cachedArtwork.recycle();
+        cachedArtwork = null;
         super.onDestroy();
     }
 
