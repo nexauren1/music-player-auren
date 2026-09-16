@@ -46,7 +46,9 @@ public final class UpdateManager {
                 String json = request(LATEST);
                 String tag = find(json, "\\\"tag_name\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
                 String apk = find(json, "\\\"browser_download_url\\\"\\s*:\\s*\\\"([^\\\"]+\\.apk)\\\"");
-                if (tag == null || apk == null) throw new IllegalStateException("Latest release has no APK");
+                if (tag == null || apk == null) {
+                    throw new IllegalStateException("Latest release has no APK");
+                }
                 release = new Release(tag, apk);
             } catch (Exception e) {
                 error = e;
@@ -113,10 +115,17 @@ public final class UpdateManager {
 
         int total = connection.getContentLength();
         int done = 0;
-        File out = new File(activity.getExternalCacheDir(), "auren-update.apk");
-        if (out.exists() && !out.delete()) throw new IllegalStateException("Could not replace cached APK");
+        File cache = activity.getExternalCacheDir();
+        if (cache == null) {
+            cache = activity.getCacheDir();
+        }
+        File out = new File(cache, "auren-update.apk");
+        if (out.exists() && !out.delete()) {
+            throw new IllegalStateException("Could not replace cached APK");
+        }
 
-        try (InputStream in = connection.getInputStream(); FileOutputStream fos = new FileOutputStream(out)) {
+        try (InputStream in = connection.getInputStream();
+             FileOutputStream fos = new FileOutputStream(out)) {
             byte[] buffer = new byte[16 * 1024];
             int n;
             int lastProgress = -1;
@@ -139,21 +148,30 @@ public final class UpdateManager {
             connection.disconnect();
         }
 
-        if (out.length() < 100_000) throw new IllegalStateException("Downloaded APK is unexpectedly small");
+        if (out.length() < 100_000) {
+            throw new IllegalStateException("Downloaded APK is unexpectedly small");
+        }
         MAIN.post(() -> status.setText("Download concluído. Abrindo o instalador do Android…"));
         return out;
     }
 
     private static void openInstaller(Activity activity, TextView status,
                                       File file, Callback callback) {
+        if (!file.isFile() || file.length() < 100_000) {
+            status.setText("O arquivo da atualização está inválido. Tente novamente.");
+            finish(callback);
+            return;
+        }
+
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             PackageManager pm = activity.getPackageManager();
             if (!pm.canRequestPackageInstalls()) {
                 status.setText("Permita instalações do Auren nas configurações do Android e volte para continuar.");
-                Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                        Uri.parse("package:" + activity.getPackageName()));
+                Intent settings = new Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + activity.getPackageName())
+                );
                 activity.startActivity(settings);
-                finish(callback);
                 return;
             }
         }
@@ -163,12 +181,35 @@ public final class UpdateManager {
                 "com.auren.musicplayer.fileprovider",
                 file
         );
-        Intent installer = new Intent(Intent.ACTION_VIEW);
-        installer.setDataAndType(uri, "application/vnd.android.package-archive");
+
+        // ACTION_INSTALL_PACKAGE explicitly asks Android's package installer
+        // to install/update this APK instead of merely opening the file.
+        Intent installer = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+        installer.setData(uri);
+        installer.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
         installer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        installer.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         installer.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        activity.startActivity(installer);
-        finish(callback);
+
+        try {
+            activity.startActivity(installer);
+            status.setText("O instalador do Android foi aberto. Confirme a atualização para concluir.");
+        } catch (Exception firstError) {
+            // Fallback for Android builds whose package installer handles
+            // ACTION_VIEW more reliably.
+            Intent fallback = new Intent(Intent.ACTION_VIEW);
+            fallback.setDataAndType(uri, "application/vnd.android.package-archive");
+            fallback.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            fallback.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                activity.startActivity(fallback);
+                status.setText("O instalador do Android foi aberto. Confirme a atualização para concluir.");
+            } catch (Exception secondError) {
+                status.setText("Não foi possível abrir o instalador do Android. Verifique as permissões de instalação.");
+                finish(callback);
+            }
+        }
     }
 
     private static String request(String address) throws Exception {
@@ -177,7 +218,8 @@ public final class UpdateManager {
         connection.setRequestProperty("User-Agent", "Auren-Music-Player");
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(15000);
-        try (InputStream in = connection.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+        try (InputStream in = connection.getInputStream();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int n;
             while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
@@ -224,6 +266,7 @@ public final class UpdateManager {
     private static final class Release {
         final String tag;
         final String apk;
+
         Release(String tag, String apk) {
             this.tag = tag;
             this.apk = apk;
