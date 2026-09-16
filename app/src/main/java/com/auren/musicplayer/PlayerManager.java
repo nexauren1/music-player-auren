@@ -2,6 +2,7 @@ package com.auren.musicplayer;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -74,7 +75,9 @@ public final class PlayerManager {
         try {
             return player == null ? 0 : player.getDuration();
         } catch (Exception e) {
-            return currentSong == null ? 0 : (int) currentSong.duration;
+            return currentSong == null
+                    ? 0
+                    : (int) currentSong.duration;
         }
     }
 
@@ -103,7 +106,8 @@ public final class PlayerManager {
                     appContext,
                     PowerManager.PARTIAL_WAKE_LOCK);
             newPlayer.setVolume(1.0f, 1.0f);
-            newPlayer.setDataSource(appContext, song.uri);
+
+            setDataSourceFromUri(newPlayer, song.uri);
 
             newPlayer.setOnPreparedListener(mp -> {
                 if (mp != player) {
@@ -113,7 +117,8 @@ public final class PlayerManager {
                 try {
                     mp.start();
                 } catch (Exception e) {
-                    failPlayback("Não foi possível iniciar esta música.");
+                    failPlayback(
+                            "Não foi possível iniciar esta música.");
                     return;
                 }
                 notifyChanged();
@@ -128,7 +133,8 @@ public final class PlayerManager {
                 if (mp == player) {
                     preparing = false;
                     releasePlayerOnly();
-                    notifyError("Não foi possível reproduzir esta música.");
+                    notifyError(
+                            "Não foi possível reproduzir esta música.");
                     notifyChanged();
                 }
                 return true;
@@ -136,20 +142,60 @@ public final class PlayerManager {
 
             newPlayer.prepareAsync();
         } catch (SecurityException e) {
-            failPlayback("O acesso à música foi bloqueado. Verifique a permissão de áudio.");
+            failPlayback(
+                    "O acesso à música foi bloqueado. "
+                            + "Verifique a permissão de áudio.");
         } catch (Exception e) {
-            failPlayback("Não foi possível abrir este ficheiro de áudio.");
+            failPlayback(
+                    "Não foi possível abrir este ficheiro de áudio.");
+        }
+    }
+
+    private static void setDataSourceFromUri(
+            MediaPlayer mediaPlayer,
+            Uri uri) throws Exception {
+        AssetFileDescriptor afd = null;
+        try {
+            afd = appContext.getContentResolver()
+                    .openAssetFileDescriptor(uri, "r");
+            if (afd == null) {
+                throw new IllegalStateException(
+                        "Ficheiro de áudio indisponível");
+            }
+
+            long start = afd.getStartOffset();
+            long length = afd.getLength();
+            if (length >= 0) {
+                mediaPlayer.setDataSource(
+                        afd.getFileDescriptor(),
+                        start,
+                        length);
+            } else {
+                mediaPlayer.setDataSource(
+                        afd.getFileDescriptor());
+            }
+        } finally {
+            if (afd != null) {
+                try {
+                    afd.close();
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 
     private static void configureAudio(MediaPlayer mediaPlayer) {
         if (Build.VERSION.SDK_INT >= 21) {
-            mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .build());
+            mediaPlayer.setAudioAttributes(
+                    new AudioAttributes.Builder()
+                            .setContentType(
+                                    AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(
+                                    AudioAttributes.USAGE_MEDIA)
+                            .build());
         } else {
-            mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            mediaPlayer.setAudioStreamType(
+                    AudioManager.STREAM_MUSIC);
         }
     }
 
@@ -311,7 +357,9 @@ public final class PlayerManager {
             return;
         }
 
-        Intent intent = new Intent(appContext, PlaybackService.class);
+        Intent intent = new Intent(
+                appContext,
+                PlaybackService.class);
         try {
             if (Build.VERSION.SDK_INT >= 26) {
                 appContext.startForegroundService(intent);
