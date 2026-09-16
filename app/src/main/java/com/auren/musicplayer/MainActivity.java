@@ -18,6 +18,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.PopupMenu;
@@ -123,6 +124,52 @@ public class MainActivity extends ComponentActivity {
         return bar;
     }
 
+    private View buildHomeHero() {
+        LinearLayout card = rounded(getColor(R.color.auren_primary), 26);
+        card.setPadding(dp(16), dp(16), dp(16), dp(16));
+        card.setElevation(dp(4));
+
+        LinearLayout media = row();
+        media.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView art = new ImageView(this);
+        art.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (miniArt != null && miniArt.getDrawable() != null) {
+            art.setImageDrawable(miniArt.getDrawable());
+        } else {
+            art.setImageResource(android.R.drawable.ic_media_play);
+            DrawableCompat.setTint(art.getDrawable(), Color.WHITE);
+        }
+        media.addView(art, new LinearLayout.LayoutParams(dp(88), dp(88)));
+
+        LinearLayout info = column();
+        info.setPadding(dp(14), 0, 0, 0);
+        TextView eyebrow = text("AGORA NO AUREN", 10, android.R.color.white);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(eyebrow);
+
+        String heroTitle = miniTitle == null ? "A música move você" : miniTitle.getText().toString();
+        if (heroTitle.trim().isEmpty()) heroTitle = "A música move você";
+        TextView title = text(heroTitle, 20, android.R.color.white);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(title, margins(0, 4, 0, 2));
+
+        String heroArtist = miniArtist == null ? "Descubra, ouça e aproveite" : miniArtist.getText().toString();
+        if (heroArtist.trim().isEmpty()) heroArtist = "Descubra, ouça e aproveite";
+        info.addView(text(heroArtist, 12, android.R.color.white));
+
+        TextView action = text("Abrir reprodução  ›", 12, android.R.color.white);
+        action.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(action, margins(0, 12, 0, 0));
+        media.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+
+        card.addView(media);
+        card.setOnClickListener(v -> {
+            if (currentTrack != null) showNowPlaying();
+        });
+        return card;
+    }
+
     private void showHome() {
         setActiveTab(homeTab);
         pageContainer.removeAllViews();
@@ -142,6 +189,8 @@ public class MainActivity extends ComponentActivity {
         brandBox.addView(title, margins(0, 4, 0, 0));
         header.addView(brandBox, new LinearLayout.LayoutParams(0, -2, 1));
         content.addView(header);
+
+        content.addView(buildHomeHero(), margins(0, 8, 0, 0));
 
         LinearLayout quick = row();
         quick.setGravity(Gravity.CENTER_VERTICAL);
