@@ -10,6 +10,7 @@ import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.media.audiofx.Equalizer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -37,6 +38,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackParameters;
+import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.util.ArrayList;
@@ -71,10 +73,19 @@ public class MainActivity extends ComponentActivity {
     private boolean userDragging;
     private float playbackSpeed = 1.0f;
     private float playbackPitch = 1.0f;
+    private final List<Track> playQueue = new ArrayList<>();
+    private long sleepTimerEndMs = 0L;
+    private boolean sleepAtTrackEnd;
+    private long abStartMs = -1L;
+    private long abEndMs = -1L;
+    private boolean abRepeatEnabled;
+    private Equalizer equalizer;
+    private String librarySortMode = "title";
 
     private final Runnable progressUpdater = new Runnable() {
         @Override public void run() {
             if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) updateNowPlayingProgress();
+            checkAdvancedFeatures();
             handler.postDelayed(this, 500);
         }
     };
@@ -82,6 +93,7 @@ public class MainActivity extends ComponentActivity {
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         player = new ExoPlayer.Builder(this).build();
+        player.setHandleAudioBecomingNoisy(true);
         buildShell();
         requestMusicPermission();
         handler.post(progressUpdater);
@@ -645,6 +657,8 @@ public class MainActivity extends ComponentActivity {
 
 
 
+
+
         ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
         functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
         DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
@@ -745,6 +759,8 @@ public class MainActivity extends ComponentActivity {
                     showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
                     showEffectsDialog();
+                } else if (action.startsWith("Efeitos:")) {
+                    showEffectsDialog();
                 } else {
                     closeNowPlaying();
                 }
@@ -827,7 +843,7 @@ public class MainActivity extends ComponentActivity {
         extras.setGravity(Gravity.CENTER);
         extras.addView(playerAction("↶", "Replay", v -> player.seekTo(0)), new LinearLayout.LayoutParams(0, dp(58), 1));
         extras.addView(playerAction("⇄", "Shuffle", v -> shufflePlay()), new LinearLayout.LayoutParams(0, dp(58), 1));
-        extras.addView(playerAction("☰", "Queue", v -> Toast.makeText(this, tracks.size() + " songs in library", Toast.LENGTH_SHORT).show()), new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("☰", "Queue", v -> showQueueDialog()), new LinearLayout.LayoutParams(0, dp(58), 1));
         root.addView(extras, margins(0, 8, 0, 0));
 
         TextView hint = text("Auren • Music that moves with you", 11, R.color.text_secondary);
@@ -837,21 +853,45 @@ public class MainActivity extends ComponentActivity {
         scroll.addView(root);
         return scroll;
     }
-
     private void showMiniPlayerMenu(View anchor) {
         PopupMenu popup = new PopupMenu(this, anchor);
+        popup.getMenu().add("Fila de reprodução");
+        popup.getMenu().add("Temporizador de sono");
+        popup.getMenu().add("Repetição");
+        popup.getMenu().add("Repetir trecho A-B");
+        popup.getMenu().add("Equalizador");
+        popup.getMenu().add("Ordenar biblioteca");
+        popup.getMenu().add("Atualizar biblioteca");
         popup.getMenu().add("Efeitos");
         popup.getMenu().add("Velocidade: " + formatEffectValue(playbackSpeed));
         popup.getMenu().add("Pitch: " + formatEffectValue(playbackPitch));
+        popup.getMenu().add("Detalhes da música");
         popup.getMenu().add("Repor efeitos");
         popup.setOnMenuItemClickListener(item -> {
             String action = item.getTitle().toString();
-            if (action.equals("Efeitos")) {
+            if (action.equals("Fila de reprodução")) {
+                showQueueDialog();
+            } else if (action.equals("Temporizador de sono")) {
+                showSleepTimerDialog();
+            } else if (action.equals("Repetição")) {
+                showRepeatDialog();
+            } else if (action.equals("Repetir trecho A-B")) {
+                showAbRepeatDialog();
+            } else if (action.equals("Equalizador")) {
+                showEqualizerDialog();
+            } else if (action.equals("Ordenar biblioteca")) {
+                showSortDialog();
+            } else if (action.equals("Atualizar biblioteca")) {
+                loadMusic();
+                Toast.makeText(this, "Biblioteca atualizada.", Toast.LENGTH_SHORT).show();
+            } else if (action.equals("Efeitos")) {
                 showEffectsDialog();
             } else if (action.startsWith("Velocidade:")) {
                 showSpeedDialog();
             } else if (action.startsWith("Pitch:")) {
                 showPitchDialog();
+            } else if (action.equals("Detalhes da música")) {
+                if (currentTrack != null) showTrackDetails(currentTrack);
             } else if (action.equals("Repor efeitos")) {
                 playbackSpeed = 1.0f;
                 playbackPitch = 1.0f;
@@ -862,6 +902,7 @@ public class MainActivity extends ComponentActivity {
         });
         popup.show();
     }
+
 
     private String formatEffectValue(float value) {
         return String.format(Locale.US, "%.2fx", value);
@@ -943,13 +984,23 @@ public class MainActivity extends ComponentActivity {
         play(tracks.get(index <= 0 ? tracks.size() - 1 : index - 1));
         refreshNowPlaying();
     }
-
     private void nextTrackInPlayer() {
+        if (!playQueue.isEmpty()) {
+            Track next = playQueue.remove(0);
+            if (sleepAtTrackEnd) {
+                sleepAtTrackEnd = false;
+                sleepTimerEndMs = 0L;
+            }
+            play(next);
+            refreshNowPlaying();
+            return;
+        }
         if (tracks.isEmpty()) return;
         int index = currentTrack == null ? -1 : tracks.indexOf(currentTrack);
         play(tracks.get(index >= tracks.size() - 1 ? 0 : index + 1));
         refreshNowPlaying();
     }
+
     private void refreshNowPlaying() {
         if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
             nowPlayingDialog.setContentView(buildNowPlayingView());
@@ -961,6 +1012,7 @@ public class MainActivity extends ComponentActivity {
             openNowPlaying();
         }
     }
+
 
 
 
@@ -1084,7 +1136,250 @@ public class MainActivity extends ComponentActivity {
                 }
             }
         }
+        applyLibrarySort();
         if (pageContainer != null) showHome();
+    }
+
+    private void showQueueDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle("Fila de reprodução");
+        if (playQueue.isEmpty()) {
+            builder.setMessage("A fila está vazia. Use ⋮ em uma música e escolha Adicionar à fila ou Reproduzir a seguir.");
+        } else {
+            String[] labels = new String[playQueue.size()];
+            for (int i = 0; i < playQueue.size(); i++) {
+                Track track = playQueue.get(i);
+                labels[i] = (i + 1) + ". " + safeTitle(track) + " — " + safeArtist(track);
+            }
+            builder.setItems(labels, (dialog, which) -> {
+                Track selected = playQueue.remove(which);
+                play(selected);
+                refreshNowPlaying();
+            });
+        }
+        builder.setNeutralButton("Limpar", (d, w) -> playQueue.clear());
+        builder.setNegativeButton("Fechar", null);
+        builder.show();
+    }
+
+    private void showSleepTimerDialog() {
+        String active = sleepTimerEndMs > 0L
+                ? "Temporizador ativo: " + formatRemaining(sleepTimerEndMs - System.currentTimeMillis())
+                : "Sem temporizador ativo";
+        String[] options = {"Desligar", "15 minutos", "30 minutos", "45 minutos", "60 minutos", "90 minutos", "Até a faixa terminar"};
+        new AlertDialog.Builder(this)
+                .setTitle("Temporizador de sono")
+                .setMessage(active)
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        sleepTimerEndMs = 0L;
+                        sleepAtTrackEnd = false;
+                        Toast.makeText(this, "Temporizador desligado.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (which == options.length - 1) {
+                        sleepTimerEndMs = 0L;
+                        sleepAtTrackEnd = true;
+                        Toast.makeText(this, "A reprodução termina ao fim da faixa.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    int[] minutes = {0, 15, 30, 45, 60, 90};
+                    sleepAtTrackEnd = false;
+                    sleepTimerEndMs = System.currentTimeMillis() + minutes[which] * 60_000L;
+                    Toast.makeText(this, "Temporizador: " + minutes[which] + " min.", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private String formatRemaining(long ms) {
+        long seconds = Math.max(0L, ms / 1000L);
+        long minutes = seconds / 60L;
+        seconds %= 60L;
+        return minutes + ":" + String.format(Locale.US, "%02d", seconds);
+    }
+
+    private void checkAdvancedFeatures() {
+        if (player == null) return;
+        if (sleepTimerEndMs > 0L && System.currentTimeMillis() >= sleepTimerEndMs) {
+            player.pause();
+            sleepTimerEndMs = 0L;
+            sleepAtTrackEnd = false;
+            updateMiniPlayer();
+            Toast.makeText(this, "Temporizador concluído.", Toast.LENGTH_SHORT).show();
+        }
+        if (abRepeatEnabled && abStartMs >= 0L && abEndMs > abStartMs
+                && player.isPlaying() && player.getCurrentPosition() >= abEndMs) {
+            player.seekTo(abStartMs);
+        }
+    }
+
+    private void showRepeatDialog() {
+        int mode = player.getRepeatMode();
+        String[] labels = {"Desligado", "Repetir faixa", "Repetir fila"};
+        int checked = mode == Player.REPEAT_MODE_ONE ? 1 : mode == Player.REPEAT_MODE_ALL ? 2 : 0;
+        new AlertDialog.Builder(this)
+                .setTitle("Repetição")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    int target = which == 1 ? Player.REPEAT_MODE_ONE : which == 2 ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF;
+                    player.setRepeatMode(target);
+                    dialog.dismiss();
+                    Toast.makeText(this, "Repetição: " + labels[which], Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private void showAbRepeatDialog() {
+        String start = abStartMs >= 0L ? formatTime(abStartMs) : "não definido";
+        String end = abEndMs >= 0L ? formatTime(abEndMs) : "não definido";
+        String[] options = {"Definir A em " + formatTime(player.getCurrentPosition()),
+                "Definir B em " + formatTime(player.getCurrentPosition()),
+                abRepeatEnabled ? "Desativar A-B" : "Ativar A-B", "Limpar A-B"};
+        new AlertDialog.Builder(this)
+                .setTitle("Repetição A-B")
+                .setMessage("A: " + start + "
+B: " + end)
+                .setItems(options, (dialog, which) -> {
+                    long position = Math.max(0L, player.getCurrentPosition());
+                    if (which == 0) {
+                        abStartMs = position;
+                        if (abEndMs <= abStartMs) abEndMs = -1L;
+                        Toast.makeText(this, "Ponto A definido.", Toast.LENGTH_SHORT).show();
+                    } else if (which == 1) {
+                        if (abStartMs < 0L || position <= abStartMs) {
+                            Toast.makeText(this, "Defina A antes de B e escolha um ponto depois de A.", Toast.LENGTH_SHORT).show();
+                        } else {
+                            abEndMs = position;
+                            Toast.makeText(this, "Ponto B definido.", Toast.LENGTH_SHORT).show();
+                        }
+                    } else if (which == 2) {
+                        if (abStartMs >= 0L && abEndMs > abStartMs) {
+                            abRepeatEnabled = !abRepeatEnabled;
+                            Toast.makeText(this, abRepeatEnabled ? "A-B ativado." : "A-B desativado.", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(this, "Defina A e B primeiro.", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        abStartMs = -1L;
+                        abEndMs = -1L;
+                        abRepeatEnabled = false;
+                        Toast.makeText(this, "A-B limpo.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Fechar", null)
+                .show();
+    }
+
+    private void showSortDialog() {
+        String[] labels = {"Título", "Artista", "Duração curta → longa", "Duração longa → curta"};
+        int checked = librarySortMode.equals("artist") ? 1
+                : librarySortMode.equals("duration_asc") ? 2
+                : librarySortMode.equals("duration_desc") ? 3 : 0;
+        new AlertDialog.Builder(this)
+                .setTitle("Ordenar biblioteca")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    librarySortMode = which == 1 ? "artist" : which == 2 ? "duration_asc" : which == 3 ? "duration_desc" : "title";
+                    getSharedPreferences("auren_player", MODE_PRIVATE).edit()
+                            .putString("library_sort", librarySortMode).apply();
+                    applyLibrarySort();
+                    showHome();
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private void applyLibrarySort() {
+        librarySortMode = getSharedPreferences("auren_player", MODE_PRIVATE)
+                .getString("library_sort", librarySortMode);
+        Collections.sort(tracks, new Comparator<Track>() {
+            @Override public int compare(Track a, Track b) {
+                int result;
+                if (librarySortMode.equals("artist")) {
+                    result = safeArtist(a).compareToIgnoreCase(safeArtist(b));
+                } else if (librarySortMode.equals("duration_asc")) {
+                    result = Long.compare(a.durationMs, b.durationMs);
+                } else if (librarySortMode.equals("duration_desc")) {
+                    result = Long.compare(b.durationMs, a.durationMs);
+                } else {
+                    result = safeTitle(a).compareToIgnoreCase(safeTitle(b));
+                }
+                if (result != 0) return result;
+                return safeTitle(a).compareToIgnoreCase(safeTitle(b));
+            }
+        });
+    }
+
+    private void showEqualizerDialog() {
+        if (player == null || player.getAudioSessionId() <= 0) {
+            Toast.makeText(this, "Inicie uma música antes de abrir o equalizador.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            if (equalizer != null) {
+                equalizer.release();
+                equalizer = null;
+            }
+            equalizer = new Equalizer(0, player.getAudioSessionId());
+            equalizer.setEnabled(true);
+            short[] range = equalizer.getBandLevelRange();
+            short bands = equalizer.getNumberOfBands();
+            int shown = Math.min(5, bands);
+
+            LinearLayout root = column();
+            root.setPadding(dp(18), dp(4), dp(18), dp(4));
+            TextView note = text("Ajuste as bandas do áudio. A disponibilidade depende do aparelho.", 12, R.color.text_secondary);
+            root.addView(note, margins(0, 0, 0, 10));
+            for (short i = 0; i < shown; i++) {
+                LinearLayout line = row();
+                int hz = equalizer.getCenterFreq(i) / 1000;
+                TextView label = text((hz >= 1000 ? (hz / 1000) + " kHz" : hz + " Hz"), 11, R.color.text_secondary);
+                line.addView(label, new LinearLayout.LayoutParams(dp(58), dp(42)));
+                SeekBar band = new SeekBar(this);
+                int min = range[0];
+                int max = range[1];
+                band.setMax(max - min);
+                band.setProgress(equalizer.getBandLevel(i) - min);
+                final short bandIndex = i;
+                band.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                    @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                        if (fromUser && equalizer != null) {
+                            equalizer.setBandLevel(bandIndex, (short) (range[0] + progress));
+                        }
+                    }
+                    @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                    @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+                });
+                line.addView(band, new LinearLayout.LayoutParams(0, dp(42), 1));
+                root.addView(line);
+            }
+            TextView reset = text("Repor EQ", 12, R.color.auren_primary);
+            reset.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            reset.setPadding(0, dp(8), 0, dp(8));
+            reset.setOnClickListener(v -> {
+                if (equalizer != null) {
+                    short[] r = equalizer.getBandLevelRange();
+                    short n = equalizer.getNumberOfBands();
+                    short middle = (short) ((r[0] + r[1]) / 2);
+                    for (short i = 0; i < n; i++) equalizer.setBandLevel(i, middle);
+                }
+            });
+            root.addView(reset);
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Equalizador Auren")
+                    .setView(root)
+                    .setPositiveButton("Fechar", null)
+                    .show();
+        } catch (Exception e) {
+            Toast.makeText(this, "O equalizador não está disponível neste aparelho.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void releaseEqualizer() {
+        if (equalizer != null) {
+            try { equalizer.release(); } catch (Exception ignored) {}
+            equalizer = null;
+        }
     }
 
     private View actionCard(String icon, String label, View.OnClickListener listener) {
@@ -1133,6 +1428,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout row = rounded(0xFFFFFFFF, 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
+        row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
@@ -1314,22 +1610,13 @@ public class MainActivity extends ComponentActivity {
         });
         popup.show();
     }
-
     private void addTrackToQueue(Track track, boolean next) {
-        if (player == null || track == null) return;
-        MediaItem item = MediaItem.fromUri(ContentUris.withAppendedId(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, track.id));
-        int count = player.getMediaItemCount();
-        if (count == 0) {
-            player.setMediaItem(item);
-            player.prepare();
-        } else if (next) {
-            int index = Math.min(1, count);
-            player.addMediaItem(index, item);
-        } else {
-            player.addMediaItem(item);
-        }
+        if (track == null) return;
+        playQueue.remove(track);
+        if (next) playQueue.add(0, track);
+        else playQueue.add(track);
     }
+
 
     private void showCreatePlaylistDialog() {
         EditText input = new EditText(this);
@@ -1416,6 +1703,7 @@ public class MainActivity extends ComponentActivity {
     private void showTrackDetails(Track track) {
         String details = "Título: " + safeTitle(track)
                 + "\nArtista: " + safeArtist(track)
+                + "\nDuração: " + formatTime(track.durationMs)
                 + "\nID: " + track.id;
         new AlertDialog.Builder(this)
                 .setTitle("Detalhes da música")
@@ -1665,5 +1953,12 @@ public class MainActivity extends ComponentActivity {
         @Override public int hashCode() {
             return Long.valueOf(id).hashCode();
         }
+    }
+
+    @Override protected void onDestroy() {
+        releaseEqualizer();
+        if (player != null) player.release();
+        handler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 }
