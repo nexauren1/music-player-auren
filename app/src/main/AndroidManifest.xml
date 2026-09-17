@@ -7,6 +7,8 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/auren_icon"
+        android:roundIcon="@drawable/auren_icon"
         android:label="Auren Music"
         android:supportsRtl="true"
         android:theme="@style/Theme.AurenMusic">
