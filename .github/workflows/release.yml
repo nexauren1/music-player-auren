@@ -32,6 +32,9 @@ jobs:
       - name: Repair Java syntax from generated feature code
         run: python3 scripts/fix_java_syntax.py
 
+      - name: Repair duplicate Android lifecycle methods
+        run: python3 scripts/fix_java_lifecycle.py
+
       - name: Verify and repair playlist helpers
         run: python3 scripts/fix_playlist_build.py
 
