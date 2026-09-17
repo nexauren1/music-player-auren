@@ -26,6 +26,9 @@ jobs:
       - name: Fix player behavior and active track state
         run: python3 scripts/fix_player_behavior.py
 
+      - name: Add advanced music feature pack
+        run: python3 scripts/add_feature_pack.py
+
       - name: Verify and repair playlist helpers
         run: python3 scripts/fix_playlist_build.py
 
