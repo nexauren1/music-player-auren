@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path('app/src/main/java/com/auren/musicplayer/MainActivity.java')
 text = path.read_text()
@@ -67,30 +68,61 @@ new = '''        player.play();
 if old in text:
     text = text.replace(old, new, 1)
 
-# Keep the full Now Playing screen synchronized with the track selected by
-# Previous/Next. Rebuild its content in place instead of closing/reopening it,
-# which prevents the old title/artwork from remaining visible.
-old_refresh = '''    private void refreshNowPlaying() {
-        closeNowPlaying();
-        openNowPlaying();
-    }'''
-new_refresh = '''    private void refreshNowPlaying() {
+# The UI enhancement script can encounter an already-created mini-player
+# functions button. Keep only one declaration so repeated builds remain safe.
+functions_block = '''        ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
+        functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
+        DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
+        functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
+        row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));'''
+while text.count('ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");') > 1:
+    text = text.replace(functions_block, '', 1)
+
+# Keep the full Now Playing screen synchronized with Previous/Next. Rebuild its
+# content in place so title, artist, artwork and controls all belong to the
+# newly selected track.
+def replace_method(source, name, replacement):
+    match = re.search(
+        r'(?m)^\s*private\s+[\w<>]+\s+' + re.escape(name) + r'\s*\([^)]*\)\s*\{',
+        source
+    )
+    if not match:
+        return source, False
+    brace = source.find('{', match.start())
+    depth = 0
+    for i in range(brace, len(source)):
+        if source[i] == '{':
+            depth += 1
+        elif source[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return source[:match.start()] + replacement.rstrip() + '\n' + source[i + 1:], True
+    return source, False
+
+refresh_replacement = '''    private void refreshNowPlaying() {
         if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
             nowPlayingDialog.setContentView(buildNowPlayingView());
             Window window = nowPlayingDialog.getWindow();
-            if (window != null) window.setLayout(-1, -1);
+            if (window != null) {
+                window.setLayout(-1, -1);
+            }
         } else if (currentTrack != null) {
             openNowPlaying();
         }
     }'''
-if old_refresh in text:
-    text = text.replace(old_refresh, new_refresh, 1)
+text, replaced = replace_method(text, 'refreshNowPlaying', refresh_replacement)
+if not replaced:
+    raise SystemExit('refreshNowPlaying method not found')
 
 # Avoid accidental auto-opening from ordinary track cards.
 if 'card.setOnClickListener(v -> { play(track); openNowPlaying(); });' in text:
     raise SystemExit('Track card still opens Now Playing automatically')
 if 'row.setOnClickListener(v -> { play(track); openNowPlaying(); });' in text:
     raise SystemExit('Track row still opens Now Playing automatically')
+
+# Fail early if the mini-player still contains duplicate function declarations.
+if text.count('ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");') > 1:
+    raise SystemExit('Duplicate mini-player functions declaration remains')
 
 path.write_text(text)
 print('Player behavior fixed: track taps stay on the current page, active tracks are highlighted, and Now Playing stays synchronized.')
