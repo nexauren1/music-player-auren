@@ -639,6 +639,12 @@ public class MainActivity extends ComponentActivity {
         functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
         row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));
 
+        ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
+        functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
+        DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
+        functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
+        row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));
+
         ImageButton next = iconButton(android.R.drawable.ic_media_next, "Next song");
         next.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
         DrawableCompat.setTint(next.getDrawable(), getColor(R.color.text_primary));
@@ -719,6 +725,8 @@ public class MainActivity extends ComponentActivity {
                 } else if (action.equals("Aleatório")) {
                     shufflePlay();
                     refreshNowPlaying();
+                } else if (action.startsWith("Efeitos:")) {
+                    showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
                     showEffectsDialog();
                 } else {
@@ -928,8 +936,13 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void refreshNowPlaying() {
-        closeNowPlaying();
-        openNowPlaying();
+        if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
+            nowPlayingDialog.setContentView(buildNowPlayingView());
+            Window window = nowPlayingDialog.getWindow();
+            if (window != null) window.setLayout(-1, -1);
+        } else if (currentTrack != null) {
+            openNowPlaying();
+        }
     }
 
     private void play(Track track) {
@@ -1098,6 +1111,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout row = rounded(0xFFFFFFFF, 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
+        row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
 
