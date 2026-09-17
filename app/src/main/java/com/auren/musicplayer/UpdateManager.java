@@ -1,6 +1,7 @@
 package com.auren.musicplayer;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -24,6 +25,7 @@ import java.util.regex.Pattern;
 
 public final class UpdateManager {
     private static final String LATEST = "https://api.github.com/repos/nexauren1/music-player-auren/releases/latest";
+    private static final String APK_TYPE = "application/vnd.android.package-archive";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
@@ -70,14 +72,28 @@ public final class UpdateManager {
                     return;
                 }
 
-                status.setText("Nova versão " + result.tag + " encontrada. Preparando download…");
-                downloadAndInstall(activity, status, result.apk, result.tag, callback);
+                status.setText("Nova versão " + result.tag + " encontrada.");
+                showUpdatePrompt(activity, status, result, callback);
             });
         });
     }
 
+    private static void showUpdatePrompt(Activity activity, TextView status,
+                                         Release release, Callback callback) {
+        new android.app.AlertDialog.Builder(activity)
+                .setTitle("Atualização disponível")
+                .setMessage("A versão " + release.tag
+                        + " está disponível. O Auren vai baixar o APK e abrir o instalador oficial do Android.")
+                .setNegativeButton("Agora não", (dialog, which) -> finish(callback))
+                .setPositiveButton("Atualizar", (dialog, which) ->
+                        downloadAndInstall(activity, status, release.apk, release.tag, callback))
+                .setOnCancelListener(dialog -> finish(callback))
+                .show();
+    }
+
     private static void downloadAndInstall(Activity activity, TextView status,
                                            String url, String version, Callback callback) {
+        status.setText("Preparando a atualização…");
         EXECUTOR.execute(() -> {
             File file = null;
             Exception error = null;
@@ -116,9 +132,7 @@ public final class UpdateManager {
         int total = connection.getContentLength();
         int done = 0;
         File cache = activity.getExternalCacheDir();
-        if (cache == null) {
-            cache = activity.getCacheDir();
-        }
+        if (cache == null) cache = activity.getCacheDir();
         File out = new File(cache, "auren-update.apk");
         if (out.exists() && !out.delete()) {
             throw new IllegalStateException("Could not replace cached APK");
@@ -166,7 +180,7 @@ public final class UpdateManager {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             PackageManager pm = activity.getPackageManager();
             if (!pm.canRequestPackageInstalls()) {
-                status.setText("Permita instalações do Auren nas configurações do Android e volte para continuar.");
+                status.setText("Permita instalações do Auren e volte para concluir a atualização.");
                 Intent settings = new Intent(
                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:" + activity.getPackageName())
@@ -182,29 +196,28 @@ public final class UpdateManager {
                 file
         );
 
-        // ACTION_INSTALL_PACKAGE explicitly asks Android's package installer
-        // to install/update this APK instead of merely opening the file.
-        Intent installer = new Intent(Intent.ACTION_INSTALL_PACKAGE);
-        installer.setData(uri);
-        installer.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
+        // Give Android both the MIME type and a readable ClipData item.
+        // This avoids OEM package installers silently opening/closing the app
+        // without showing the update confirmation screen.
+        Intent installer = new Intent(Intent.ACTION_VIEW);
+        installer.setDataAndType(uri, APK_TYPE);
+        installer.setClipData(ClipData.newRawUri("AurenUpdate", uri));
         installer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        installer.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         installer.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         try {
             activity.startActivity(installer);
-            status.setText("O instalador do Android foi aberto. Confirme a atualização para concluir.");
+            status.setText("Instalador do Android aberto. Toque em Atualizar para concluir.");
         } catch (Exception firstError) {
-            // Fallback for Android builds whose package installer handles
-            // ACTION_VIEW more reliably.
-            Intent fallback = new Intent(Intent.ACTION_VIEW);
-            fallback.setDataAndType(uri, "application/vnd.android.package-archive");
+            Intent fallback = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+            fallback.setDataAndType(uri, APK_TYPE);
+            fallback.setClipData(ClipData.newRawUri("AurenUpdate", uri));
+            fallback.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
             fallback.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            fallback.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             try {
                 activity.startActivity(fallback);
-                status.setText("O instalador do Android foi aberto. Confirme a atualização para concluir.");
+                status.setText("Instalador do Android aberto. Toque em Atualizar para concluir.");
             } catch (Exception secondError) {
                 status.setText("Não foi possível abrir o instalador do Android. Verifique as permissões de instalação.");
                 finish(callback);
