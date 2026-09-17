@@ -639,6 +639,8 @@ public class MainActivity extends ComponentActivity {
 
 
 
+
+
         ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
         functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
         DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
@@ -725,6 +727,8 @@ public class MainActivity extends ComponentActivity {
                 } else if (action.equals("Aleatório")) {
                     shufflePlay();
                     refreshNowPlaying();
+                } else if (action.startsWith("Efeitos:")) {
+                    showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
                     showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
@@ -952,6 +956,7 @@ public class MainActivity extends ComponentActivity {
 
 
 
+
     private void play(Track track) {
         if (track == null || player == null) return;
         currentTrack = track;
@@ -1118,6 +1123,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout row = rounded(0xFFFFFFFF, 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
+        row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
