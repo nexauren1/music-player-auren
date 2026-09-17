@@ -29,6 +29,9 @@ jobs:
       - name: Add advanced music feature pack
         run: python3 scripts/add_feature_pack.py
 
+      - name: Repair Java syntax from generated feature code
+        run: python3 scripts/fix_java_syntax.py
+
       - name: Verify and repair playlist helpers
         run: python3 scripts/fix_playlist_build.py
 
