@@ -633,11 +633,9 @@ public class MainActivity extends ComponentActivity {
         info.addView(miniArtist, margins(0, 2, 0, 0));
         row.addView(info, new LinearLayout.LayoutParams(0, dp(52), 1));
 
-        ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
-        functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
-        DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
-        functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
-        row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));
+
+
+
 
         ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
         functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
@@ -725,6 +723,8 @@ public class MainActivity extends ComponentActivity {
                 } else if (action.equals("Aleatório")) {
                     shufflePlay();
                     refreshNowPlaying();
+                } else if (action.startsWith("Efeitos:")) {
+                    showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
                     showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
@@ -934,16 +934,18 @@ public class MainActivity extends ComponentActivity {
         play(tracks.get(index >= tracks.size() - 1 ? 0 : index + 1));
         refreshNowPlaying();
     }
-
     private void refreshNowPlaying() {
         if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
             nowPlayingDialog.setContentView(buildNowPlayingView());
             Window window = nowPlayingDialog.getWindow();
-            if (window != null) window.setLayout(-1, -1);
+            if (window != null) {
+                window.setLayout(-1, -1);
+            }
         } else if (currentTrack != null) {
             openNowPlaying();
         }
     }
+
 
     private void play(Track track) {
         if (track == null || player == null) return;
@@ -1111,6 +1113,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout row = rounded(0xFFFFFFFF, 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
+        row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
