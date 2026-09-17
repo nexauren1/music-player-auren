@@ -67,6 +67,25 @@ new = '''        player.play();
 if old in text:
     text = text.replace(old, new, 1)
 
+# Keep the full Now Playing screen synchronized with the track selected by
+# Previous/Next. Rebuild its content in place instead of closing/reopening it,
+# which prevents the old title/artwork from remaining visible.
+old_refresh = '''    private void refreshNowPlaying() {
+        closeNowPlaying();
+        openNowPlaying();
+    }'''
+new_refresh = '''    private void refreshNowPlaying() {
+        if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
+            nowPlayingDialog.setContentView(buildNowPlayingView());
+            Window window = nowPlayingDialog.getWindow();
+            if (window != null) window.setLayout(-1, -1);
+        } else if (currentTrack != null) {
+            openNowPlaying();
+        }
+    }'''
+if old_refresh in text:
+    text = text.replace(old_refresh, new_refresh, 1)
+
 # Avoid accidental auto-opening from ordinary track cards.
 if 'card.setOnClickListener(v -> { play(track); openNowPlaying(); });' in text:
     raise SystemExit('Track card still opens Now Playing automatically')
@@ -74,4 +93,4 @@ if 'row.setOnClickListener(v -> { play(track); openNowPlaying(); });' in text:
     raise SystemExit('Track row still opens Now Playing automatically')
 
 path.write_text(text)
-print('Player behavior fixed: track taps stay on the current page and active tracks are highlighted.')
+print('Player behavior fixed: track taps stay on the current page, active tracks are highlighted, and Now Playing stays synchronized.')
