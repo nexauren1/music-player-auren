@@ -661,6 +661,8 @@ public class MainActivity extends ComponentActivity {
 
 
 
+
+
         ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
         functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
         DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
@@ -747,6 +749,8 @@ public class MainActivity extends ComponentActivity {
                 } else if (action.equals("Aleatório")) {
                     shufflePlay();
                     refreshNowPlaying();
+                } else if (action.startsWith("Efeitos:")) {
+                    showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
                     showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
@@ -909,6 +913,7 @@ public class MainActivity extends ComponentActivity {
 
 
 
+
     private String formatEffectValue(float value) {
         return String.format(Locale.US, "%.2fx", value);
     }
@@ -1017,6 +1022,7 @@ public class MainActivity extends ComponentActivity {
             openNowPlaying();
         }
     }
+
 
 
 
@@ -1242,8 +1248,7 @@ public class MainActivity extends ComponentActivity {
                 abRepeatEnabled ? "Desativar A-B" : "Ativar A-B", "Limpar A-B"};
         new AlertDialog.Builder(this)
                 .setTitle("Repetição A-B")
-                .setMessage("A: " + start + "
-B: " + end)
+                .setMessage("A: " + start + "\nB: " + end)
                 .setItems(options, (dialog, which) -> {
                     long position = Math.max(0L, player.getCurrentPosition());
                     if (which == 0) {
@@ -1444,6 +1449,7 @@ B: " + end)
         row.setTag(track.id);
         row.setTag(track.id);
         row.setTag(track.id);
+        row.setTag(track.id);
 
         ImageView art = artwork(48);
         art.setImageURI(track.albumArtUri());
@@ -1623,6 +1629,7 @@ B: " + end)
         if (next) playQueue.add(0, track);
         else playQueue.add(track);
     }
+
 
 
 
