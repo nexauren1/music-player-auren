@@ -1,25 +1,26 @@
-name: Android Release
+name: Android Build & Release
 
-# Nexauren release workflow
+# Nexauren Android CI/CD
+# - Pull requests / main: build only
+# - v* tags: signed release + GitHub Release
+# - No automatic releases on normal commits
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
-    paths-ignore:
-      - 'build-status.json'
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
-
 
 permissions:
   contents: write
 
-env:
-  ANDROID_HOME: /usr/local/lib/android/sdk
-  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -46,7 +47,19 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 
-      - name: Build APK
+      - name: Validate version
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -o "versionName '[^']*'" app/build.gradle | head -1 | cut -d"'" -f2)
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            test "$GITHUB_REF_NAME" = "v$VERSION"
+          fi
+
+      - name: Build Android app
         id: build
         env:
           AUREN_KEYSTORE_B64: ${{ secrets.AUREN_KEYSTORE_B64 }}
@@ -57,101 +70,70 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -n "$AUREN_KEYSTORE_B64" ]              && [ -n "$AUREN_KEY_ALIAS" ]              && [ -n "$AUREN_KEY_PASS" ]              && [ -n "$AUREN_STORE_PASS" ]; then
-            echo "signed=true" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ -z "$AUREN_KEYSTORE_B64" ] || \
+               [ -z "$AUREN_KEY_ALIAS" ] || \
+               [ -z "$AUREN_KEY_PASS" ] || \
+               [ -z "$AUREN_STORE_PASS" ]; then
+              echo "A signed release requires AUREN_KEYSTORE_B64, AUREN_KEY_ALIAS, AUREN_KEY_PASS and AUREN_STORE_PASS."
+              exit 1
+            fi
 
             printf '%s' "$AUREN_KEYSTORE_B64" | tr -d '[:space:]' | base64 --decode > "$AUREN_KEYSTORE_PATH"
             test -s "$AUREN_KEYSTORE_PATH"
             keytool -list -keystore "$AUREN_KEYSTORE_PATH" -storepass "$AUREN_STORE_PASS" >/dev/null
 
             gradle --no-daemon clean assembleRelease --stacktrace
-            cp app/build/outputs/apk/release/app-release.apk Nexauren-Music-Player.apk
-            echo "mode=signed" >> "$GITHUB_OUTPUT"
+            MODE="signed"
+            APK="app/build/outputs/apk/release/app-release.apk"
           else
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-
             gradle --no-daemon clean assembleDebug --stacktrace
-            cp app/build/outputs/apk/debug/app-debug.apk Nexauren-Music-Player.apk
-            echo "mode=debug-signed" >> "$GITHUB_OUTPUT"
+            MODE="debug"
+            APK="app/build/outputs/apk/debug/app-debug.apk"
           fi
 
-          test -s Nexauren-Music-Player.apk
+          test -s "$APK"
+          cp "$APK" Nexauren-Music-Player.apk
           sha256sum Nexauren-Music-Player.apk > Nexauren-Music-Player.apk.sha256
 
-      - name: Read version
-        id: version
-        run: |
-          set -euo pipefail
-          VERSION=$(grep -o "versionName '[^']*'" app/build.gradle | head -1 | cut -d"'" -f2)
-          test -n "$VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK artifact
-        id: upload
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Nexauren-Music-Player-v${{ steps.version.outputs.version }}
+          name: Nexauren-Music-Player-v${{ steps.version.outputs.version }}-${{ github.run_number }}
           path: |
             Nexauren-Music-Player.apk
             Nexauren-Music-Player.apk.sha256
 
       - name: Publish GitHub Release
-        id: publish
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
-          MODE: ${{ steps.build.outputs.mode }}
         run: |
           set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            Nexauren-Music-Player.apk \
+            Nexauren-Music-Player.apk.sha256 \
+            --title "Nexauren Music Player $VERSION" \
+            --generate-notes
 
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            TAG="${GITHUB_REF_NAME}"
-          else
-            TAG="v${VERSION}-build.${GITHUB_RUN_NUMBER}"
-          fi
-
-          if [ "${MODE}" = "signed" ]; then
-            NOTE="Signed release APK."
-          else
-            NOTE="Debug-signed APK for free direct distribution/testing. A persistent release keystore can be added later for seamless updates."
-          fi
-
-          gh release create "${TAG}"             Nexauren-Music-Player.apk             Nexauren-Music-Player.apk.sha256             --title "Music Player - Nexauren ${TAG}"             --notes "${NOTE}"
-
-      - name: Record build status
+      - name: Build summary
         if: always()
         env:
           VERSION: ${{ steps.version.outputs.version }}
           MODE: ${{ steps.build.outputs.mode }}
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ID: ${{ github.run_id }}
-          COMMIT_SHA: ${{ github.sha }}
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-          VERSION_OUTCOME: ${{ steps.version.outcome }}
-          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
-          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
         run: |
-          set -euo pipefail
-          STATUS="${{ job.status }}"
-          TAG="v${VERSION}-build.${RUN_NUMBER}"
-          cat > build-status.json <<EOF
           {
-            "status": "${STATUS}",
-            "version": "${VERSION}",
-            "tag": "${TAG}",
-            "run_number": "${RUN_NUMBER}",
-            "run_id": "${RUN_ID}",
-            "commit": "${COMMIT_SHA}",
-            "mode": "${MODE}",
-            "build_outcome": "${BUILD_OUTCOME}",
-            "version_outcome": "${VERSION_OUTCOME}",
-            "upload_outcome": "${UPLOAD_OUTCOME}",
-            "publish_outcome": "${PUBLISH_OUTCOME}",
-            "workflow": "Android Release"
-          }
-          EOF
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add build-status.json
-          git commit -m "chore: record Android Release status [skip ci]" || true
-          git push origin HEAD:main
+            echo "## Nexauren Music Player"
+            echo ""
+            echo "- Version: \`$VERSION\`"
+            echo "- Build mode: \`$MODE\`"
+            echo "- Ref: \`$GITHUB_REF_NAME\`"
+            if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+              echo "- Release: published from version tag"
+            else
+              echo "- Release: not published (build validation only)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
