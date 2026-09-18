@@ -154,15 +154,11 @@ public final class UpdateManager {
                     name = "Nexauren Music Player " + cleanVersion(tag);
                 }
 
-                String notes = find(
-                        json,
-                        "\"body\"\\s*:\\s*\"((?:[^\\"]|\\\\.)*)\"");
-
                 release = new Release(
                         tag,
                         apk,
                         name,
-                        notes == null ? "" : unescape(notes));
+                        "");
             } catch (Exception e) {
                 error = e;
             }
@@ -678,7 +674,7 @@ public final class UpdateManager {
                 .replace("\\n", "\n")
                 .replace("\\r", "\r")
                 .replace("\\t", "\t")
-                .replace("\\\"", """)
+                .replace("\\\"", "\"")
                 .replace("\\\\", "\\");
     }
 
