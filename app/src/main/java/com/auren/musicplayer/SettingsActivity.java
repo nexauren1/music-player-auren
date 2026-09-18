@@ -108,12 +108,12 @@ public class SettingsActivity extends ComponentActivity {
         audioCard.addView(eq);
         content.addView(audioCard, margins(0, 0, 0, 14));
 
-        addSection(content, "ATUALIZAÇÕES", "Distribuição gratuita enquanto a Google Play fica para o futuro.");
+        addSection(content, "ATUALIZAÇÕES", "Consulte a página oficial do Nexauren para ver novidades e obter a versão atual.");
 
         LinearLayout updates = card();
-        updates.addView(text("Music Player - Nexauren Updates", 16, ThemeManager.resolve(this, R.color.text_primary)));
+        updates.addView(text("Nexauren Updates", 16, ThemeManager.resolve(this, R.color.text_primary)));
         updates.addView(text(
-                "Verifica o GitHub Releases. Quando houver uma versão nova, o Android pode abrir o instalador para concluir a atualização.",
+                "Acompanhe a versão atual, novidades e instruções de atualização na página oficial.",
                 13, ThemeManager.resolve(this, R.color.text_secondary)), margins(0, 5, 0, 10));
         updateStatus = text("Versão instalada: " + BuildConfig.VERSION_NAME, 12,
                 ThemeManager.resolve(this, R.color.text_secondary));
@@ -121,13 +121,13 @@ public class SettingsActivity extends ComponentActivity {
         Button check = button("Verificar atualização");
         check.setOnClickListener(v -> UpdateManager.check(this, updateStatus));
         updates.addView(check);
-        Button downloads = button("Abrir GitHub Releases");
-        downloads.setOnClickListener(v -> {
+        Button website = button("Abrir página oficial");
+        website.setOnClickListener(v -> {
             Intent i = new Intent(Intent.ACTION_VIEW,
-                    android.net.Uri.parse("https://github.com/nexauren1/music-player-auren/releases"));
+                    android.net.Uri.parse("https://nexauren1.github.io/music-player-auren/"));
             startActivity(i);
         });
-        updates.addView(downloads, margins(0, 8, 0, 0));
+        updates.addView(website);
         content.addView(updates, margins(0, 0, 0, 14));
 
         addSection(content, "BIBLIOTECA & DADOS", "As suas preferências e estatísticas são locais.");
@@ -145,7 +145,7 @@ public class SettingsActivity extends ComponentActivity {
         LinearLayout about = rounded(ThemeManager.resolve(this, R.color.accent_mint), 22);
         about.setPadding(dp(16), dp(15), dp(16), dp(15));
         TextView aboutText = text(
-                "Music Player - Nexauren\nLocal • Privado • Personalizável\nVersão " + BuildConfig.VERSION_NAME,
+                "NEXAUREN\nMusic Player • Local • Personalizável\nVersão " + BuildConfig.VERSION_NAME,
                 13, ThemeManager.resolve(this, R.color.text_primary));
         aboutText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         about.addView(aboutText);
