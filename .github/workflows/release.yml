@@ -114,7 +114,7 @@ jobs:
             NOTE="Debug-signed APK for free direct distribution/testing. A persistent release keystore can be added later for seamless updates."
           fi
 
-          gh release create "${TAG}"             Nexauren-Music-Player.apk             Nexauren-Music-Player.apk.sha256             --title "Nexauren Music Player ${TAG}"             --notes "${NOTE}"
+          gh release create "${TAG}"             Nexauren-Music-Player.apk             Nexauren-Music-Player.apk.sha256             --title "Music Player - Nexauren ${TAG}"             --notes "${NOTE}"
 
       - name: Record build status
         if: always()
