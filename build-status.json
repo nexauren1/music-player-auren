@@ -1,0 +1,9 @@
+{
+  "status": "failure",
+  "version": "",
+  "tag": "v-build.232",
+  "run_number": "232",
+  "commit": "a5954bc24bf91b6f4bca328779ee05914a2d1b16",
+  "mode": "",
+  "workflow": "Android Release"
+}
