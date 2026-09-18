@@ -18,6 +18,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -74,6 +75,7 @@ public class MainActivity extends ComponentActivity {
     private MediaController mediaController;
     private ListenableFuture<MediaController> controllerFuture;
     private boolean notificationPermissionRequested;
+    private boolean musicPermissionDenied;
     private boolean playbackSessionRestored;
 
     private final Player.Listener playbackListener = new Player.Listener() {
@@ -371,7 +373,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout list = column();
 
         if (tracks.isEmpty()) {
-            list.addView(emptyCard("Nenhuma música encontrada no dispositivo. Toque em \"Atualizar biblioteca\" no menu."));
+            list.addView(musicLibraryEmptyState());
         } else {
             for (int i = 0; i < tracks.size(); i++) {
                 list.addView(trackRow(tracks.get(i), 0));
@@ -593,7 +595,7 @@ public class MainActivity extends ComponentActivity {
         card.addView(title);
         List<Track> smart = autoFavoriteTracks(3);
         String main = smart.isEmpty() ? "Ainda está a aprender os seus hábitos" :
-                "A IA local encontrou " + smart.size() + " favoritas prováveis";
+                "Os padrões locais sugerem " + smart.size() + " favoritas prováveis";
         TextView mainText = text(main, 15, R.color.text_primary);
         mainText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         card.addView(mainText, margins(0, 4, 0, 2));
@@ -661,70 +663,326 @@ public class MainActivity extends ComponentActivity {
 
     private void showNexaurenChallenge() {
         pageContainer.removeAllViews();
+
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = featureScreen(
-                "Nexauren Challenge",
-                "Um jogo rápido usando apenas a sua biblioteca local.");
+                "Desafio musical",
+                "Descubra a música usando pistas da sua própria biblioteca.");
 
-        final String[] scoreKey = {"challenge_score"};
-        int score = getSharedPreferences("nexauren_fun", MODE_PRIVATE).getInt(scoreKey[0], 0);
-        content.addView(featureMetricCard("PONTUAÇÃO", String.valueOf(score), "respostas certas"), margins(0,0,0,10));
+        SharedPreferences prefs =
+                getSharedPreferences(
+                        "nexauren_fun",
+                        MODE_PRIVATE);
 
-        if (tracks.size() < 4) {
-            content.addView(emptyCard("Adicione pelo menos 4 músicas para jogar."));
+        int score =
+                prefs.getInt("challenge_score", 0);
+        int rounds =
+                prefs.getInt("challenge_rounds", 0);
+        int streak =
+                prefs.getInt("challenge_streak", 0);
+        int bestStreak =
+                prefs.getInt("challenge_best_streak", 0);
+
+        LinearLayout metrics = row();
+        metrics.addView(
+                statCard(
+                        "PONTOS",
+                        String.valueOf(score),
+                        rounds + " rodadas"),
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(92),
+                        1));
+        metrics.addView(
+                statCard(
+                        "SEQUÊNCIA",
+                        String.valueOf(streak),
+                        "acertos seguidos"),
+                margins(8, 0, 0, 0));
+        metrics.addView(
+                statCard(
+                        "RECORDE",
+                        String.valueOf(bestStreak),
+                        "melhor sequência"),
+                margins(8, 0, 0, 0));
+        content.addView(metrics);
+
+        LinearLayout rules = rounded(
+                ThemeManager.resolve(this, R.color.accent_soft),
+                20);
+        rules.setPadding(
+                dp(15),
+                dp(14),
+                dp(15),
+                dp(14));
+
+        TextView rulesTitle = text(
+                "COMO JOGAR",
+                10,
+                R.color.auren_primary);
+        rulesTitle.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD);
+        rules.addView(rulesTitle);
+
+        TextView rulesText = text(
+                "1. Leia as pistas.  2. Escolha uma música.  3. Cada acerto vale +1 ponto e aumenta a sequência.  4. Um erro zera a sequência.",
+                12,
+                R.color.text_secondary);
+        rules.addView(
+                rulesText,
+                margins(0, 4, 0, 0));
+        content.addView(
+                rules,
+                margins(0, 10, 0, 12));
+
+        if (tracks.size() < 3) {
+            content.addView(
+                    emptyCard(
+                            "Adicione pelo menos 3 músicas para começar o desafio."));
         } else {
-            List<Track> pool = new ArrayList<>(tracks);
+            List<Track> pool =
+                    new ArrayList<>(tracks);
             Collections.shuffle(pool);
+
             Track answer = pool.get(0);
-            List<Track> options = new ArrayList<>();
+            int optionCount =
+                    Math.min(4, pool.size());
+
+            List<Track> options =
+                    new ArrayList<>();
             options.add(answer);
-            for (int i = 1; i < pool.size() && options.size() < 4; i++) {
-                if (pool.get(i).id != answer.id) options.add(pool.get(i));
+
+            for (int i = 1;
+                    i < pool.size()
+                    && options.size() < optionCount;
+                    i++) {
+                if (pool.get(i).id != answer.id) {
+                    options.add(pool.get(i));
+                }
             }
+
             Collections.shuffle(options);
 
-            LinearLayout question = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
-            question.setPadding(dp(16),dp(16),dp(16),dp(16));
-            TextView q = text("QUAL É A MÚSICA?", 11, R.color.auren_primary);
-            q.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            question.addView(q);
-            question.addView(text("Escolha a faixa correta entre as opções.", 14, R.color.text_primary), margins(0,4,0,10));
-            content.addView(question);
+            content.addView(
+                    featureSectionTitle("PISTAS"));
 
-            for (Track option : options) {
-                Button b = new Button(this);
-                b.setText(safeTitle(option) + " • " + safeArtist(option));
-                b.setAllCaps(false);
-                b.setTextSize(13);
-                b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-                b.setTextColor(ThemeManager.textOnAccent(this));
-                b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ThemeManager.accent(this)));
-                b.setOnClickListener(v -> {
-                    boolean correct = option.id == answer.id;
-                    android.content.SharedPreferences p = getSharedPreferences("nexauren_fun", MODE_PRIVATE);
-                    int old = p.getInt("challenge_score", 0);
-                    if (correct) {
-                        p.edit().putInt("challenge_score", old + 1).apply();
-                        Toast.makeText(this, "✓ Acertou! +1 ponto", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(this, "Quase! A resposta era " + safeTitle(answer), Toast.LENGTH_SHORT).show();
-                    }
-                    showNexaurenChallenge();
-                });
-                content.addView(b, margins(0,5,0,0));
+            String artist =
+                    safeArtist(answer);
+            String album =
+                    safeAlbum(answer);
+            String genre =
+                    safeGenre(answer);
+
+            content.addView(
+                    featureAction(
+                            "♫",
+                            "Artista",
+                            artist.isEmpty()
+                                    ? "Não informado"
+                                    : artist,
+                            v -> { }));
+            content.addView(
+                    featureAction(
+                            "▤",
+                            "Álbum",
+                            album.isEmpty()
+                                    ? "Não informado"
+                                    : album,
+                            v -> { }),
+                    margins(0, 7, 0, 0));
+            content.addView(
+                    featureAction(
+                            "✦",
+                            "Género",
+                            genre.isEmpty()
+                                    ? "Não informado"
+                                    : genre,
+                            v -> { }),
+                    margins(0, 7, 0, 0));
+            content.addView(
+                    featureAction(
+                            "◷",
+                            "Duração",
+                            formatTime(answer.durationMs),
+                            v -> { }),
+                    margins(0, 7, 0, 0));
+
+            content.addView(
+                    featureSectionTitle(
+                            "QUAL É A MÚSICA?"));
+
+            TextView hint = text(
+                    "Escolha 1 das " + optionCount + " opções.",
+                    12,
+                    R.color.text_secondary);
+            content.addView(
+                    hint,
+                    margins(0, 0, 0, 8));
+
+            for (int i = 0;
+                    i < options.size();
+                    i++) {
+                final Track option =
+                        options.get(i);
+                final int optionNumber =
+                        i + 1;
+
+                Button answerButton =
+                        button(
+                                optionNumber
+                                        + ". "
+                                        + safeTitle(option));
+                answerButton.setOnClickListener(
+                        v -> {
+                            boolean correct =
+                                    option.id == answer.id;
+
+                            int newRounds =
+                                    prefs.getInt(
+                                            "challenge_rounds",
+                                            0)
+                                            + 1;
+                            int oldScore =
+                                    prefs.getInt(
+                                            "challenge_score",
+                                            0);
+                            int oldStreak =
+                                    prefs.getInt(
+                                            "challenge_streak",
+                                            0);
+
+                            int newScore =
+                                    correct
+                                            ? oldScore + 1
+                                            : oldScore;
+                            int newStreak =
+                                    correct
+                                            ? oldStreak + 1
+                                            : 0;
+                            int newBest =
+                                    Math.max(
+                                            prefs.getInt(
+                                                    "challenge_best_streak",
+                                                    0),
+                                            newStreak);
+
+                            prefs.edit()
+                                    .putInt(
+                                            "challenge_rounds",
+                                            newRounds)
+                                    .putInt(
+                                            "challenge_score",
+                                            newScore)
+                                    .putInt(
+                                            "challenge_streak",
+                                            newStreak)
+                                    .putInt(
+                                            "challenge_best_streak",
+                                            newBest)
+                                    .apply();
+
+                            String resultMessage;
+                            if (correct) {
+                                resultMessage =
+                                        "Resposta certa! +1 ponto\\n"
+                                                + "Sequência: "
+                                                + newStreak
+                                                + "\\n"
+                                                + safeTitle(answer)
+                                                + " • "
+                                                + safeArtist(answer);
+                            } else {
+                                resultMessage =
+                                        "A resposta era:\\n"
+                                                + safeTitle(answer)
+                                                + " • "
+                                                + safeArtist(answer)
+                                                + "\\n\\n"
+                                                + "A sequência voltou a 0.";
+                            }
+
+                            new AlertDialog.Builder(this)
+                                    .setTitle(
+                                            correct
+                                                    ? "Acertou!"
+                                                    : "Quase!")
+                                    .setMessage(
+                                            resultMessage)
+                                    .setPositiveButton(
+                                            "Próxima",
+                                            (dialog, which) ->
+                                                    showNexaurenChallenge())
+                                    .setNegativeButton(
+                                            "Fechar",
+                                            null)
+                                    .show();
+                        });
+
+                content.addView(
+                        answerButton,
+                        margins(
+                                0,
+                                5,
+                                0,
+                                0));
             }
         }
 
-        content.addView(featureAction("↻", "Novo desafio", "Gerar outra pergunta", v -> showNexaurenChallenge()),
-                margins(0,14,0,0));
+        content.addView(
+                featureAction(
+                        "↻",
+                        "Nova pergunta",
+                        "Gerar outro desafio",
+                        v -> showNexaurenChallenge()),
+                margins(0, 14, 0, 0));
 
-        TextView fun = text("Cada rodada usa músicas que já estão no aparelho. Nada é enviado para um serviço externo.", 11, R.color.text_secondary);
-        fun.setGravity(Gravity.CENTER);
-        content.addView(fun, margins(0,12,0,0));
+        content.addView(
+                featureAction(
+                        "↺",
+                        "Recomeçar pontuação",
+                        "Limpar pontos e sequência",
+                        v -> {
+                            new AlertDialog.Builder(this)
+                                    .setTitle(
+                                            "Recomeçar desafio?")
+                                    .setMessage(
+                                            "A pontuação, as rodadas e a melhor sequência serão apagadas.")
+                                    .setNegativeButton(
+                                            "Cancelar",
+                                            null)
+                                    .setPositiveButton(
+                                            "Recomeçar",
+                                            (dialog, which) -> {
+                                                prefs.edit()
+                                                        .remove("challenge_score")
+                                                        .remove("challenge_rounds")
+                                                        .remove("challenge_streak")
+                                                        .remove("challenge_best_streak")
+                                                        .apply();
+                                                showNexaurenChallenge();
+                                            })
+                                    .show();
+                        }),
+                margins(0, 7, 0, 0));
+
+        TextView privacy = text(
+                "O desafio usa apenas as músicas e metadados disponíveis no aparelho. Nada é enviado para um serviço externo.",
+                11,
+                R.color.text_secondary);
+        privacy.setGravity(Gravity.CENTER);
+        content.addView(
+                privacy,
+                margins(0, 12, 0, 0));
 
         scroll.addView(content);
-        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1,-1));
+        pageContainer.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -1));
     }
+
 
     private void showIntelligenceHub() {
         pageContainer.removeAllViews();
@@ -3275,8 +3533,105 @@ public class MainActivity extends ComponentActivity {
         String permission = android.os.Build.VERSION.SDK_INT >= 33
                 ? Manifest.permission.READ_MEDIA_AUDIO
                 : Manifest.permission.READ_EXTERNAL_STORAGE;
-        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) loadMusic();
-        else ActivityCompat.requestPermissions(this, new String[]{permission}, MUSIC_PERMISSION);
+
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+            musicPermissionDenied = false;
+            loadMusic();
+            return;
+        }
+
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{permission},
+                MUSIC_PERMISSION);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(
+                requestCode,
+                permissions,
+                grantResults);
+
+        if (requestCode == MUSIC_PERMISSION) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+            musicPermissionDenied = !granted;
+            if (granted) {
+                loadMusic();
+            } else {
+                showHome();
+                Toast.makeText(
+                        this,
+                        "Permissão de música não concedida.",
+                        Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void openMusicPermissionSettings() {
+        Intent intent = new Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getPackageName()));
+        try {
+            startActivity(intent);
+        } catch (Exception ignored) {
+            Toast.makeText(
+                    this,
+                    "Abra as definições do Android e permita o acesso às músicas.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private View musicLibraryEmptyState() {
+        LinearLayout card = rounded(
+                ThemeManager.resolve(this, R.color.card),
+                20);
+        card.setPadding(
+                dp(16),
+                dp(16),
+                dp(16),
+                dp(16));
+
+        String message = musicPermissionDenied
+                ? "O Nexauren precisa de acesso às suas músicas para mostrar a biblioteca."
+                : "Nenhuma música encontrada no dispositivo.";
+
+        TextView title = text(
+                musicPermissionDenied
+                        ? "Permissão necessária"
+                        : "Biblioteca vazia",
+                16,
+                R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(title);
+
+        TextView detail = text(
+                message,
+                12,
+                R.color.text_secondary);
+        card.addView(
+                detail,
+                margins(0, 4, 0, 10));
+
+        Button action = button(
+                musicPermissionDenied
+                        ? "Abrir definições"
+                        : "Atualizar biblioteca");
+        action.setOnClickListener(v -> {
+            if (musicPermissionDenied) {
+                openMusicPermissionSettings();
+            } else {
+                loadMusic();
+            }
+        });
+        card.addView(action);
+
+        return card;
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] resultados) {
