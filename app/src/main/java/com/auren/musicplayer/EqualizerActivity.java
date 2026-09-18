@@ -92,9 +92,7 @@ public class EqualizerActivity extends ComponentActivity {
             LinearLayout card = rounded(ThemeManager.card(this), 22);
             card.setPadding(dp(18), dp(18), dp(18), dp(18));
             TextView t = text(
-                    "O equalizador do dispositivo ainda não está disponível.
-
-Reproduza uma música e abra esta tela novamente. Alguns aparelhos não oferecem efeitos de áudio por sessão.",
+                    "O equalizador do dispositivo ainda não está disponível.\n\nReproduza uma música e abra esta tela novamente. Alguns aparelhos não oferecem efeitos de áudio por sessão.",
                     14, ThemeManager.resolve(this, R.color.text_secondary));
             card.addView(t);
             bandContainer.addView(card);
