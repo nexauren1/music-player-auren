@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.3.2 — Official icon and automatic updates
+
+### Atualização
+- Aplicado o ícone oficial do Nexauren Music Player ao aplicativo.
+- Adicionada verificação automática de novas versões pelo GitHub Releases.
+- Adicionado aviso dentro do aplicativo quando uma versão mais recente é encontrada.
+- Adicionada notificação do Android para avisar sobre uma nova versão.
+- Adicionado fluxo para baixar o APK, abrir o instalador Android e retomar uma instalação pendente.
+- A notificação de cada versão é enviada apenas uma vez por versão publicada.
+
+### Release
+- O APK de produção desta versão é o mesmo arquivo que é anexado à GitHub Release.
+- O workflow não usa mais um Actions artifact separado como entrega pública.
+- A release valida package, versionName e versionCode antes da publicação.
+
 ## 3.3.0 — Launch preparation
 
 ### Corrigido

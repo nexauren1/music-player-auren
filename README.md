@@ -4,9 +4,9 @@ O **Nexauren Music Player** é um player Android focado em música local: biblio
 
 ## Estado do projeto
 
-**Versão de preparação para lançamento: 3.3.0**
+**Versão atual: 3.3.2**
 
-A versão 3.3.0 concentra-se em estabilidade, clareza da experiência e um processo de release seguro. Commits normais em `main` fazem apenas validação/build; uma versão pública só é criada através de uma tag de versão.
+A versão 3.3.2 aplica o ícone oficial e inclui atualização automática com aviso no aplicativo e notificação do Android. Commits normais em `main` fazem validação/build; versões públicas são publicadas diretamente como GitHub Releases.
 
 ## Recursos
 
@@ -103,15 +103,15 @@ Para uma versão de produção assinada, o ambiente precisa de um keystore persi
 
 ## Release
 
-O fluxo oficial está documentado em [docs/RELEASING.md](docs/RELEASING.md).
+O fluxo oficial está documentado em [docs/RELEASING.md](docs/RELEASING.md). O APK anexado à GitHub Release é o mesmo build de produção que o utilizador deve instalar.
 
 Regra principal:
 
 **push para `main` ≠ release pública**
 
-Uma release pública só é publicada quando uma tag no formato `vX.Y.Z` é criada.
+Uma release pública só é publicada pelo workflow de release para uma tag no formato `vX.Y.Z` ou pela linha `release/*`, sempre usando o APK de produção assinado.
 
-A versão da tag precisa corresponder ao `versionName` em `app/build.gradle`.
+A versão da release precisa corresponder ao `versionName` em `app/build.gradle`.
 
 ## Atualizações dentro do app
 

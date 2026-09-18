@@ -53,6 +53,8 @@ public final class UpdateManager {
             "pending_update_name";
     private static final String UPDATE_NOTES =
             "pending_update_notes";
+    private static final String LAST_NOTIFIED_VERSION =
+            "last_notified_update_version";
     private static final String CHANNEL_ID =
             "app_updates";
     private static final int UPDATE_NOTIFICATION_ID =
@@ -574,6 +576,26 @@ public final class UpdateManager {
             Context context,
             String version) {
 
+        if (Build.VERSION.SDK_INT >= 33
+                && androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+            // The in-app update dialog still works. The system alert is posted
+            // as soon as the user grants notification permission.
+            return;
+        }
+
+        String normalizedVersion = cleanVersion(version);
+        android.content.SharedPreferences prefs =
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+
+        String lastNotified =
+                prefs.getString(LAST_NOTIFIED_VERSION, "");
+        if (normalizedVersion.equals(lastNotified)) {
+            return;
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager =
                     context.getSystemService(NotificationManager.class);
@@ -615,14 +637,21 @@ public final class UpdateManager {
                             .setSmallIcon(
                                     R.drawable.nexauren_music_player_icon)
                             .setContentTitle(
-                                    "Nova versão do Nexauren")
+                                    "Atualização disponível")
                             .setContentText(
-                                    "A versão " + version + " está disponível.")
+                                    "Nexauren Music Player " + normalizedVersion
+                                            + " já está disponível.")
                             .setContentIntent(pendingIntent)
                             .setAutoCancel(true)
                             .setPriority(
                                     NotificationCompat.PRIORITY_DEFAULT)
                             .build());
+
+            prefs.edit()
+                    .putString(
+                            LAST_NOTIFIED_VERSION,
+                            normalizedVersion)
+                    .apply();
         } catch (SecurityException ignored) {
             // Android 13+ may block notifications until permission is granted.
         }

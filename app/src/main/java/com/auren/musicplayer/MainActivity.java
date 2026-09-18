@@ -162,10 +162,20 @@ public class MainActivity extends ComponentActivity {
         buildShell();
         connectPlaybackController();
         requestMusicPermission();
+        requestNotificationPermissionIfNeeded();
         handler.post(progressUpdater);
-        UpdateManager.checkForUpdates(this);
-        if (savedInstanceState == null && getIntent() != null
-                && getIntent().getStringExtra("nexauren_update_action") != null) {
+
+        // Give Android a moment to finish any runtime permission dialog before
+        // checking the GitHub release. This also avoids showing two dialogs at once.
+        if (!intentHasUpdateAction(getIntent())) {
+            handler.postDelayed(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    UpdateManager.checkForUpdates(this);
+                }
+            }, 900);
+        }
+
+        if (savedInstanceState == null && intentHasUpdateAction(getIntent())) {
             handleUpdateIntent(getIntent());
         }
     }
@@ -3595,6 +3605,15 @@ public class MainActivity extends ComponentActivity {
                         this,
                         "Permissão de música não concedida.",
                         Toast.LENGTH_LONG).show();
+            }
+        } else if (requestCode == NOTIFICATION_PERMISSION) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+            // Once notification permission is granted, run the release check
+            // immediately so an available update can produce the system alert.
+            if (granted && !isFinishing()) {
+                UpdateManager.checkForUpdates(this);
             }
         }
     }
