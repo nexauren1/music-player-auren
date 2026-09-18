@@ -83,9 +83,17 @@ public class SettingsActivity extends ComponentActivity {
         accentPreview.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         themeCard.addView(accentPreview, margins(0, 4, 0, 8));
 
-        Button colorButton = button("Escolher qualquer cor");
-        colorButton.setOnClickListener(v -> showAccentDialog());
-        themeCard.addView(colorButton);
+        LinearLayout colorActions = row();
+        Button hexButton = button("Código HEX");
+        hexButton.setOnClickListener(v -> showAccentDialog());
+        colorActions.addView(hexButton, new LinearLayout.LayoutParams(0, -2, 1));
+
+        Button paletteButton = button("Escolher cor");
+        paletteButton.setOnClickListener(v -> showAccentPaletteDialog());
+        LinearLayout.LayoutParams paletteLp = new LinearLayout.LayoutParams(0, -2, 1);
+        paletteLp.setMargins(dp(8), 0, 0, 0);
+        colorActions.addView(paletteButton, paletteLp);
+        themeCard.addView(colorActions);
         content.addView(themeCard, margins(0, 0, 0, 14));
 
         addSection(content, "ÁUDIO", "Ferramentas para controlar o som.");
@@ -150,21 +158,20 @@ public class SettingsActivity extends ComponentActivity {
 
     private void showAccentDialog() {
         EditText input = new EditText(this);
-        input.setHint("#635BFF");
+        input.setHint("#06B6D4");
         input.setSingleLine(true);
         input.setText(ThemeManager.hex(ThemeManager.accent(this)));
         input.setSelectAllOnFocus(true);
         new AlertDialog.Builder(this)
-                .setTitle("Cor de destaque")
-                .setMessage("Introduza uma cor HEX, por exemplo #FF4D8D.")
+                .setTitle("Código HEX")
+                .setMessage("Para quem conhece códigos de cor. Exemplo: #06B6D4")
                 .setView(input)
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Aplicar", (d, w) -> {
                     try {
                         String raw = input.getText().toString().trim();
                         int color = Color.parseColor(raw);
-                        ThemeManager.setAccent(this, Color.rgb(Color.red(color), Color.green(color), Color.blue(color)));
-                        recreate();
+                        applyAccentInPlace(Color.rgb(Color.red(color), Color.green(color), Color.blue(color)));
                     } catch (IllegalArgumentException e) {
                         new AlertDialog.Builder(this)
                                 .setTitle("Cor inválida")
@@ -174,6 +181,76 @@ public class SettingsActivity extends ComponentActivity {
                     }
                 })
                 .show();
+    }
+
+    private void showAccentPaletteDialog() {
+        int[][] palette = {
+                {Color.rgb(37, 99, 235), "Azul".hashCode()},
+                {Color.rgb(6, 182, 212), "Azul ciano".hashCode()},
+                {Color.rgb(29, 78, 216), "Azul escuro".hashCode()},
+                {Color.rgb(124, 58, 237), "Roxo".hashCode()},
+                {Color.rgb(99, 102, 241), "Índigo".hashCode()},
+                {Color.rgb(236, 72, 153), "Rosa".hashCode()},
+                {Color.rgb(239, 68, 68), "Vermelho".hashCode()},
+                {Color.rgb(249, 115, 22), "Laranja".hashCode()},
+                {Color.rgb(234, 179, 8), "Amarelo".hashCode()},
+                {Color.rgb(34, 197, 94), "Verde".hashCode()},
+                {Color.rgb(16, 185, 129), "Esmeralda".hashCode()},
+                {Color.rgb(20, 184, 166), "Turquesa".hashCode()}
+        };
+        String[] names = {"Azul", "Azul ciano", "Azul escuro", "Roxo", "Índigo", "Rosa", "Vermelho", "Laranja", "Amarelo", "Verde", "Esmeralda", "Turquesa"};
+
+        android.widget.GridLayout grid = new android.widget.GridLayout(this);
+        grid.setColumnCount(2);
+        int current = ThemeManager.accent(this);
+        for (int i = 0; i < palette.length; i++) {
+            int color = palette[i][0];
+            TextView swatch = new TextView(this);
+            swatch.setText(names[i] + "\n" + ThemeManager.hex(color) + (isSameColor(color, current) ? "  ✓" : ""));
+            swatch.setTextSize(14);
+            swatch.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            swatch.setTextColor(contrast(color));
+            swatch.setGravity(Gravity.CENTER);
+            swatch.setPadding(dp(10), dp(10), dp(10), dp(10));
+            swatch.setBackground(roundDrawable(color, 18));
+            swatch.setContentDescription(names[i] + " " + ThemeManager.hex(color));
+            swatch.setOnClickListener(v -> applyAccentInPlace(color));
+            android.widget.GridLayout.LayoutParams lp = new android.widget.GridLayout.LayoutParams();
+            lp.width = 0;
+            lp.height = dp(78);
+            lp.columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f);
+            lp.setMargins(dp(5), dp(5), dp(5), dp(5));
+            grid.addView(swatch, lp);
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setPadding(dp(4), dp(4), dp(4), dp(4));
+        scroll.addView(grid);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Escolher uma cor")
+                .setMessage("Escolha uma cor pronta. O código HEX aparece em cada opção.")
+                .setView(scroll)
+                .setNegativeButton("Fechar", null)
+                .create();
+        dialog.show();
+    }
+
+    private void applyAccentInPlace(int color) {
+        ThemeManager.setAccent(this, color);
+        if (accentPreview != null) {
+            accentPreview.setText("Cor de destaque: " + ThemeManager.hex(color));
+            accentPreview.setTextColor(color);
+        }
+        buildUi();
+    }
+
+    private boolean isSameColor(int a, int b) {
+        return Color.red(a) == Color.red(b) && Color.green(a) == Color.green(b) && Color.blue(a) == Color.blue(b);
+    }
+
+    private int contrast(int bg) {
+        double y = 0.299 * Color.red(bg) + 0.587 * Color.green(bg) + 0.114 * Color.blue(bg);
+        return y < 160 ? Color.WHITE : Color.BLACK;
     }
 
     private void confirmReset() {
@@ -225,11 +302,6 @@ public class SettingsActivity extends ComponentActivity {
         b.setTextColor(contrast(ThemeManager.accent(this)));
         b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ThemeManager.accent(this)));
         return b;
-    }
-
-    private int contrast(int bg) {
-        double y = 0.299 * Color.red(bg) + 0.587 * Color.green(bg) + 0.114 * Color.blue(bg);
-        return y < 160 ? Color.WHITE : Color.BLACK;
     }
 
     private LinearLayout row() {

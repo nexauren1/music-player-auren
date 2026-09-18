@@ -68,6 +68,7 @@ public class MainActivity extends ComponentActivity {
     private MediaController mediaController;
     private ListenableFuture<MediaController> controllerFuture;
     private boolean notificationPermissionRequested;
+    private boolean playbackSessionRestored;
 
     private final Player.Listener playbackListener = new Player.Listener() {
         @Override
@@ -141,7 +142,9 @@ public class MainActivity extends ComponentActivity {
                     player = controller;
                     player.addListener(playbackListener);
                     applyPlaybackEffects();
+                    syncCurrentTrackWithController();
                     updateMiniPlayer();
+                    restorePlaybackSession();
                 });
             } catch (Exception e) {
                 runOnUiThread(() ->
@@ -172,7 +175,7 @@ public class MainActivity extends ComponentActivity {
 
         SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
         if (player.getPlaybackState() == Player.STATE_ENDED) {
-            prefs.edit().remove("resume_id").remove("resume_position").apply();
+            prefs.edit().remove("resume_id").remove("resume_position").remove("resume_playing").apply();
             return;
         }
 
@@ -180,6 +183,7 @@ public class MainActivity extends ComponentActivity {
         prefs.edit()
                 .putLong("resume_id", currentTrack.id)
                 .putLong("resume_position", position)
+                .putBoolean("resume_playing", player.isPlaying())
                 .commit();
     }
 
@@ -1206,11 +1210,17 @@ public class MainActivity extends ComponentActivity {
             return;
         }
 
-        boolean newPlayEvent = currentTrack == null
-                || currentTrack.id != track.id
-                || player.getPlaybackState() == Player.STATE_ENDED;
-        boolean restoringTrack = !newPlayEvent
-                && player.getMediaItemCount() == 0;
+        boolean sameTrack = currentTrack != null && currentTrack.id == track.id;
+        boolean ended = player.getPlaybackState() == Player.STATE_ENDED;
+        if (sameTrack && player.getMediaItemCount() > 0 && !ended) {
+            player.play();
+            updateMiniPlayer();
+            highlightPlayingTrack();
+            return;
+        }
+
+        boolean newPlayEvent = !sameTrack || ended;
+        boolean restoringTrack = sameTrack && player.getMediaItemCount() == 0 && !ended;
         currentTrack = track;
         if (newPlayEvent) {
             playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
@@ -1245,7 +1255,8 @@ public class MainActivity extends ComponentActivity {
         player.prepare();
         requestNotificationPermissionIfNeeded();
         player.play();
-        prefs.edit().remove("resume_position").remove("resume_id").apply();
+        prefs.edit().remove("resume_position").remove("resume_id").remove("resume_playing").apply();
+        playbackSessionRestored = true;
         updateMiniPlayer();
         highlightPlayingTrack();
     }
@@ -1289,15 +1300,69 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void updateMiniPlayer() {
-        if (currentTrack == null) return;
+        if (currentTrack == null || miniTitle == null || miniArtist == null || miniArt == null || miniPlay == null) return;
         miniTitle.setText(safeTitle(currentTrack));
         miniArtist.setText(safeArtist(currentTrack));
         miniArt.setImageURI(currentTrack.albumArtUri());
         if (miniArt.getDrawable() == null) miniArt.setImageResource(android.R.drawable.ic_media_play);
-        miniPlay.setImageResource(player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+        boolean playing = player != null && player.isPlaying();
+        miniPlay.setImageResource(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
         if (homeTab != null && pageContainer != null) {
             // Keep the current page; the mini player must never trap the user.
         }
+    }
+
+    private void syncCurrentTrackWithController() {
+        if (player == null || player.getMediaItemCount() == 0) return;
+        String mediaId = player.getCurrentMediaItem() == null ? null : player.getCurrentMediaItem().mediaId;
+        if (mediaId == null || mediaId.trim().isEmpty()) return;
+        try {
+            long id = Long.parseLong(mediaId);
+            for (Track track : tracks) {
+                if (track.id == id) {
+                    currentTrack = track;
+                    playbackSessionRestored = true;
+                    return;
+                }
+            }
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private void restorePlaybackSession() {
+        if (playbackSessionRestored || player == null || tracks.isEmpty() || currentTrack == null) return;
+        if (player.getMediaItemCount() > 0) {
+            syncCurrentTrackWithController();
+            updateMiniPlayer();
+            highlightPlayingTrack();
+            return;
+        }
+
+        SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
+        long resumeId = prefs.getLong("resume_id", -1L);
+        if (resumeId != currentTrack.id) return;
+
+        long position = Math.max(0L, prefs.getLong("resume_position", 0L));
+        boolean shouldPlay = prefs.getBoolean("resume_playing", false);
+        Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, currentTrack.id);
+        MediaItem item = new MediaItem.Builder()
+                .setUri(uri)
+                .setMediaId(String.valueOf(currentTrack.id))
+                .setMediaMetadata(new androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(safeTitle(currentTrack))
+                        .setArtist(safeArtist(currentTrack))
+                        .setAlbumArtist(safeArtist(currentTrack))
+                        .setArtworkUri(currentTrack.albumArtUri())
+                        .build())
+                .build();
+
+        if (position > 0L) player.setMediaItem(item, position);
+        else player.setMediaItem(item);
+        player.prepare();
+        playbackSessionRestored = true;
+        updateMiniPlayer();
+        highlightPlayingTrack();
+        if (shouldPlay) player.play();
     }
 
     private void shufflePlay() {
@@ -1376,6 +1441,7 @@ public class MainActivity extends ComponentActivity {
         restoreListeningState();
         if (pageContainer != null) showHome();
         updateMiniPlayer();
+        restorePlaybackSession();
     }
 
     private void showQueueDialog() {
