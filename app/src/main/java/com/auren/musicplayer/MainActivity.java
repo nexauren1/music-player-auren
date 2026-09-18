@@ -3659,18 +3659,7 @@ public class MainActivity extends ComponentActivity {
 
         return card;
     }
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] resultados) {
-        super.onRequestPermissionsResult(requestCode, permissions, resultados);
-        if (requestCode == MUSIC_PERMISSION && resultados.length > 0
-                && resultados[0] == PackageManager.PERMISSION_GRANTED) {
-            loadMusic();
-        } else if (requestCode == MUSIC_PERMISSION) {
-            Toast.makeText(this,
-                    "É necessária a permissão de música para mostrar a sua biblioteca.",
-                    Toast.LENGTH_LONG).show();
-        }
-    }
+
 
 
     private void updateAlbumAchievement() {
@@ -3975,6 +3964,18 @@ public class MainActivity extends ComponentActivity {
         a.setOnClickListener(listener);
         row.addView(a, new LinearLayout.LayoutParams(dp(80), dp(42)));
         parent.addView(row, margins(0, 22, 0, 4));
+    }
+
+    private Button button(String label) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setTextSize(14);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setTextColor(Color.WHITE);
+        b.setBackgroundColor(ThemeManager.resolve(this, R.color.auren_primary));
+        b.setPadding(dp(16), dp(6), dp(16), dp(6));
+        return b;
     }
 
     private View horizontalTrackCard(Track track) {
