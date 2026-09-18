@@ -1251,7 +1251,7 @@ public class MainActivity extends ComponentActivity {
                 null,
                 MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
             if (cursor != null) {
-                while (cursor.moveToPróxima música()) {
+                while (cursor.moveToNext()) {
                     tracks.add(new Track(
                             cursor.getLong(0),
                             cursor.getString(1),
