@@ -1,5 +1,6 @@
 package com.auren.musicplayer;
 
+import android.content.ComponentName;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -1584,7 +1585,7 @@ public class MainActivity extends ComponentActivity {
         for (Track track : tracks) {
             if (currentTrack != null && track.id == currentTrack.id) continue;
             if (!result.contains(track)) result.add(track);
-            if (result.size() >= 8) break;
+            if (resultado.size() >= 8) break;
         }
         return result;
     }
