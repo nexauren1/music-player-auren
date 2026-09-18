@@ -17,9 +17,9 @@ Auren Music Player é um reprodutor de música Android focado em uma experiênci
 
 **Neste momento, o Auren não depende da Google Play.**
 
-As versões podem ser distribuídas gratuitamente através do GitHub Releases. Cada release publica o APK e o respetivo SHA-256 para verificação. O GitHub permite disponibilizar ficheiros binários como assets das releases e partilhar uma URL estável para a release mais recente. citeturn881013search5turn881013search3
+As versões podem ser distribuídas gratuitamente através do GitHub Releases. Cada release publica o APK e o respetivo SHA-256 para verificação. O GitHub permite disponibilizar ficheiros binários como assets das releases e partilhar uma URL estável para a release mais recente.
 
-A Google Play fica como uma etapa futura, quando houver condições para criar a conta de desenvolvedor. A inscrição do Play Console atualmente custa US$ 25 uma única vez. citeturn881013search6
+A Google Play fica como uma etapa futura, quando houver condições para criar a conta de desenvolvedor. A inscrição do Play Console atualmente custa US$ 25 uma única vez.
 
 ## Arquitetura
 
