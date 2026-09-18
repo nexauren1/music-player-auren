@@ -3,6 +3,7 @@ name: Android Build & Release
 # Nexauren Android CI/CD
 # - Pull requests / main: build only
 # - v* tags: signed release + GitHub Release
+# - release/* branches: signed release bootstrap (used when a tag cannot be created by the integration)
 # - No automatic releases on normal commits
 
 on:
@@ -12,6 +13,7 @@ on:
   push:
     branches:
       - main
+      - 'release/*'
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -59,6 +61,13 @@ jobs:
             test "$GITHUB_REF_NAME" = "v$VERSION"
           fi
 
+          if [[ "$GITHUB_REF_NAME" == release/* ]]; then
+            RELEASE_TAG="v$VERSION"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build Android app
         id: build
         env:
@@ -70,7 +79,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+          RELEASE_MODE=false
+          if [ "$GITHUB_REF_TYPE" = "tag" ] || [[ "$GITHUB_REF_NAME" == release/* ]]; then
+            RELEASE_MODE=true
+          fi
+
+          if [ "$RELEASE_MODE" = true ]; then
             if [ -z "$AUREN_KEYSTORE_B64" ] || \
                [ -z "$AUREN_KEY_ALIAS" ] || \
                [ -z "$AUREN_KEY_PASS" ] || \
@@ -107,13 +121,15 @@ jobs:
             Nexauren-Music-Player.apk.sha256
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/release/')
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" \
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || true
+          gh release create "$RELEASE_TAG" \
             Nexauren-Music-Player.apk \
             Nexauren-Music-Player.apk.sha256 \
             --title "Nexauren Music Player $VERSION" \
@@ -124,6 +140,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
           MODE: ${{ steps.build.outputs.mode }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           {
             echo "## Nexauren Music Player"
@@ -131,8 +148,8 @@ jobs:
             echo "- Version: \`$VERSION\`"
             echo "- Build mode: \`$MODE\`"
             echo "- Ref: \`$GITHUB_REF_NAME\`"
-            if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-              echo "- Release: published from version tag"
+            if [[ "$GITHUB_REF_TYPE" == "tag" || "$GITHUB_REF_NAME" == release/* ]]; then
+              echo "- Release: publishing \`$RELEASE_TAG\`"
             else
               echo "- Release: not published (build validation only)"
             fi
