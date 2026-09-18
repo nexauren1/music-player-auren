@@ -167,7 +167,12 @@ public class MainActivity extends ComponentActivity {
         String key = themeKey();
         if (appliedThemeKey != null && !appliedThemeKey.equals(key) && !isFinishing()) {
             appliedThemeKey = key;
-            recreate();
+            // Rebuild the visual shell in place instead of recreating the Activity.
+            // This keeps playback, the MediaController and the current session alive.
+            buildShell();
+            syncCurrentTrackWithController();
+            updateMiniPlayer();
+            highlightPlayingTrack();
         } else if (appliedThemeKey == null) {
             appliedThemeKey = key;
         }
@@ -546,7 +551,7 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout stats2 = row();
         AchievementManager.Stats a = AchievementManager.stats(this);
-        stats2.addView(statCard("SEQUÊNCIA", AurenAnalytics.summary(this).streakCurrent + " dia(s)", "Auren Journey"), new LinearLayout.LayoutParams(0, dp(92), 1));
+        stats2.addView(statCard("SEQUÊNCIA", AurenAnalytics.summary(this).streakCurrent + " dia(s)", "Nexauren Journey"), new LinearLayout.LayoutParams(0, dp(92), 1));
         stats2.addView(statCard("MÚSICAS", String.valueOf(a.uniqueTracks), "diferentes"), margins(8, 0, 0, 0));
         content.addView(stats2, margins(0, 8, 0, 14));
 
@@ -730,7 +735,7 @@ public class MainActivity extends ComponentActivity {
     private void showAurenMix() {
         pageContainer.removeAllViews();
         ScrollView scroll = new ScrollView(this);
-        LinearLayout content = featureScreen("Auren Mix", "Uma sequência inteligente, baseada no seu comportamento e no horário.");
+        LinearLayout content = featureScreen("Nexauren Mix", "Uma sequência inteligente, baseada no seu comportamento e no horário.");
         List<Track> queue = buildSmartQueue();
         content.addView(featureAction("▶", "Iniciar Mix", "Reorganizar as próximas músicas agora", v -> {
             List<Track> fresh = buildSmartQueue();
@@ -772,7 +777,7 @@ public class MainActivity extends ComponentActivity {
     private void showAurenFocus() {
         String[] options = {"Sem temporizador", "15 minutos", "30 minutos", "45 minutos", "60 minutos"};
         new AlertDialog.Builder(this)
-                .setTitle("Auren Focus")
+                .setTitle("Nexauren Focus")
                 .setMessage("Uma sessão limpa, com música local. O temporizador é opcional.")
                 .setItems(options, (dialog, which) -> {
                     int[] mins = {0, 15, 30, 45, 60};
@@ -795,7 +800,7 @@ public class MainActivity extends ComponentActivity {
     private void showAurenMemories() {
         pageContainer.removeAllViews();
         ScrollView scroll = new ScrollView(this);
-        LinearLayout content = featureScreen("Auren Memories", "Pequenas memórias da sua própria biblioteca.");
+        LinearLayout content = featureScreen("Nexauren Memories", "Pequenas memórias da sua própria biblioteca.");
         AurenAnalytics.Summary s = AurenAnalytics.summary(this);
         content.addView(featureMetricCard("Nos últimos 7 dias", AurenAnalytics.formatDuration(s.weekMs), s.weekPlays + " reproduções"));
         content.addView(featureSectionTitle("O que ouvi ontem à noite"));
@@ -819,7 +824,7 @@ public class MainActivity extends ComponentActivity {
     private void showAurenReplay() {
         pageContainer.removeAllViews();
         ScrollView scroll = new ScrollView(this);
-        LinearLayout content = featureScreen("Auren Replay", "O resumo musical do seu mês.");
+        LinearLayout content = featureScreen("Nexauren Replay", "O resumo musical do seu mês.");
         AurenAnalytics.Summary s = AurenAnalytics.summary(this);
         content.addView(featureMetricCard("Este mês", AurenAnalytics.formatDuration(s.monthMs), s.monthPlays + " reproduções"));
         content.addView(featureMetricCard("Sempre", AurenAnalytics.formatDuration(s.totalMs), s.totalPlays + " reproduções"),
@@ -837,7 +842,7 @@ public class MainActivity extends ComponentActivity {
     private void showAurenDiscovery() {
         pageContainer.removeAllViews();
         ScrollView scroll = new ScrollView(this);
-        LinearLayout content = featureScreen("Auren Discovery", "Descubra o que a sua biblioteca ainda esconde.");
+        LinearLayout content = featureScreen("Nexauren Discovery", "Descubra o que a sua biblioteca ainda esconde.");
         List<Track> list = new ArrayList<>(tracks);
         Collections.sort(list, (a, b) -> {
             long at = AurenAnalytics.trackTime(this, a.id);
@@ -862,7 +867,7 @@ public class MainActivity extends ComponentActivity {
     private void showAurenMood() {
         String[] moods = {"Energético", "Calmo", "Noite", "Viagem", "Foco", "Aleatório"};
         new AlertDialog.Builder(this)
-                .setTitle("Auren Mood")
+                .setTitle("Nexauren Mood")
                 .setMessage("Escolha um ambiente. A fila usa apenas a música que já existe no aparelho.")
                 .setItems(moods, (dialog, which) -> {
                     List<Track> queue = buildMoodQueue(moods[which]);
@@ -872,7 +877,7 @@ public class MainActivity extends ComponentActivity {
                     }
                     if (which == moods.length - 1) Collections.shuffle(queue);
                     startQueue(queue);
-                    Toast.makeText(this, "Auren Mood: " + moods[which], Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Nexauren Mood: " + moods[which], Toast.LENGTH_SHORT).show();
                 })
                 .show();
     }
@@ -1108,16 +1113,16 @@ public class MainActivity extends ComponentActivity {
         addDrawerItem(items, "↗", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
         addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
         addDrawerItem(items, "✦", "Sugestões", () -> { dialog.dismiss(); showSuggestions(); });
-        addDrawerItem(items, "★", "Auren Journey", () -> { dialog.dismiss(); showJourney(); });
+        addDrawerItem(items, "★", "Nexauren Journey", () -> { dialog.dismiss(); showJourney(); });
 
         addDrawerSection(items, "NEXAUREN INTELLIGENCE");
         addDrawerItem(items, "◉", "Estatísticas completas", () -> { dialog.dismiss(); showAnalyticsDashboard(); });
-        addDrawerItem(items, "✦", "Auren Mix", () -> { dialog.dismiss(); showAurenMix(); });
-        addDrawerItem(items, "◌", "Auren Focus", () -> { dialog.dismiss(); showAurenFocus(); });
-        addDrawerItem(items, "◷", "Auren Memories", () -> { dialog.dismiss(); showAurenMemories(); });
-        addDrawerItem(items, "↻", "Auren Replay", () -> { dialog.dismiss(); showAurenReplay(); });
-        addDrawerItem(items, "⌕", "Auren Discovery", () -> { dialog.dismiss(); showAurenDiscovery(); });
-        addDrawerItem(items, "◈", "Auren Mood", () -> { dialog.dismiss(); showAurenMood(); });
+        addDrawerItem(items, "✦", "Nexauren Mix", () -> { dialog.dismiss(); showAurenMix(); });
+        addDrawerItem(items, "◌", "Nexauren Focus", () -> { dialog.dismiss(); showAurenFocus(); });
+        addDrawerItem(items, "◷", "Nexauren Memories", () -> { dialog.dismiss(); showAurenMemories(); });
+        addDrawerItem(items, "↻", "Nexauren Replay", () -> { dialog.dismiss(); showAurenReplay(); });
+        addDrawerItem(items, "⌕", "Nexauren Discovery", () -> { dialog.dismiss(); showAurenDiscovery(); });
+        addDrawerItem(items, "◈", "Nexauren Mood", () -> { dialog.dismiss(); showAurenMood(); });
 
         addDrawerSection(items, "FERRAMENTAS");
         addDrawerItem(items, "≋", "Equalizador", () -> {
@@ -2759,9 +2764,9 @@ public class MainActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(22));
 
-        TextView eyebrow = text("AUREN JOURNEY", 11, R.color.auren_primary);
+        TextView eyebrow = text("NEXAUREN JOURNEY", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text("Auren Journey", 28, R.color.text_primary);
+        TextView title = text("Nexauren Journey", 28, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         content.addView(eyebrow);
         content.addView(title, margins(0, 3, 0, 8));
