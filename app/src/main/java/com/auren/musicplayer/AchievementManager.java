@@ -429,7 +429,65 @@ public final class AchievementManager {
                 "50 dias",
                 days >= 50));
 
+        result.add(new Badge(
+                "five_hundred_minutes_day",
+                "Dia intenso",
+                "Ouça pelo menos 500 minutos num único dia.",
+                "500 min num dia",
+                AurenAnalytics.timeForDay(context, 0) >= 500L * 60_000L));
+
+        result.add(new Badge(
+                "five_sessions",
+                "Cinco sessões",
+                "Complete pelo menos cinco sessões de audição.",
+                "5 sessões",
+                AurenAnalytics.sessions(context).size() >= 5));
+
+        result.add(new Badge(
+                "ten_sessions",
+                "Companhia musical",
+                "Complete pelo menos dez sessões de audição.",
+                "10 sessões",
+                AurenAnalytics.sessions(context).size() >= 10));
+
+        result.add(new Badge(
+                "ten_repeat",
+                "Repetidor",
+                "Repita uma mesma música pelo menos 10 vezes.",
+                "10 repetições",
+                hasRepeatedTrackAtLeast(context, 10)));
+
+        result.add(new Badge(
+                "twenty_five_artists",
+                "Cartógrafo musical",
+                "Ouça músicas de 25 artistas diferentes.",
+                "25 artistas",
+                artists >= 25));
+
+        result.add(new Badge(
+                "hundred_days",
+                "Colecionador de dias",
+                "Tenha atividade em 100 dias.",
+                "100 dias",
+                days >= 100));
+
         return result;
+    }
+
+    private static boolean hasRepeatedTrackAtLeast(Context context, int minimum) {
+        SharedPreferences p = context.getSharedPreferences(
+                "auren_player", Context.MODE_PRIVATE);
+        String raw = p.getString("play_counts_v2", "");
+        if (raw == null) return false;
+        for (String entry : raw.split(";")) {
+            String[] pair = entry.split("=", 2);
+            if (pair.length == 2) {
+                try {
+                    if (Integer.parseInt(pair[1]) >= minimum) return true;
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        return false;
     }
 
     private static boolean hasRepeatedTrack(
