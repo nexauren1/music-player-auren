@@ -13,7 +13,7 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class AurenAnalytics {
-    private static final String PREFS = "nexauren_analytics_v2";
+    private static final String PREFS = "nexauren_analytics_v1";
     private static final long SESSION_GAP_MS = 20 * 60 * 1000L;
     private static final long TICK_CAP_MS = 5000L;
     private static final long EVENT_DEDUP_MS = 1500L;
