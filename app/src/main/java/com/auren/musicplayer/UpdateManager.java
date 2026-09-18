@@ -120,6 +120,12 @@ public final class UpdateManager {
 
     public static void check(
             Activity activity,
+            TextView status) {
+        check(activity, status, null);
+    }
+
+    public static void check(
+            Activity activity,
             TextView status,
             Callback callback) {
 
