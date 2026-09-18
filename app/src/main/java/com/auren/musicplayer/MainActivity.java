@@ -658,6 +658,73 @@ public class MainActivity extends ComponentActivity {
         return card;
     }
 
+    private void showNexaurenChallenge() {
+        pageContainer.removeAllViews();
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = featureScreen(
+                "Nexauren Challenge",
+                "Um jogo rápido usando apenas a sua biblioteca local.");
+
+        final String[] scoreKey = {"challenge_score"};
+        int score = getSharedPreferences("nexauren_fun", MODE_PRIVATE).getInt(scoreKey[0], 0);
+        content.addView(featureMetricCard("PONTUAÇÃO", String.valueOf(score), "respostas certas"), margins(0,0,0,10));
+
+        if (tracks.size() < 4) {
+            content.addView(emptyCard("Adicione pelo menos 4 músicas para jogar."));
+        } else {
+            List<Track> pool = new ArrayList<>(tracks);
+            Collections.shuffle(pool);
+            Track answer = pool.get(0);
+            List<Track> options = new ArrayList<>();
+            options.add(answer);
+            for (int i = 1; i < pool.size() && options.size() < 4; i++) {
+                if (pool.get(i).id != answer.id) options.add(pool.get(i));
+            }
+            Collections.shuffle(options);
+
+            LinearLayout question = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
+            question.setPadding(dp(16),dp(16),dp(16),dp(16));
+            TextView q = text("QUAL É A MÚSICA?", 11, R.color.auren_primary);
+            q.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            question.addView(q);
+            question.addView(text("Escolha a faixa correta entre as opções.", 14, R.color.text_primary), margins(0,4,0,10));
+            content.addView(question);
+
+            for (Track option : options) {
+                Button b = new Button(this);
+                b.setText(safeTitle(option) + " • " + safeArtist(option));
+                b.setAllCaps(false);
+                b.setTextSize(13);
+                b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                b.setTextColor(ThemeManager.textOnAccent(this));
+                b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ThemeManager.accent(this)));
+                b.setOnClickListener(v -> {
+                    boolean correct = option.id == answer.id;
+                    android.content.SharedPreferences p = getSharedPreferences("nexauren_fun", MODE_PRIVATE);
+                    int old = p.getInt("challenge_score", 0);
+                    if (correct) {
+                        p.edit().putInt("challenge_score", old + 1).apply();
+                        Toast.makeText(this, "✓ Acertou! +1 ponto", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "Quase! A resposta era " + safeTitle(answer), Toast.LENGTH_SHORT).show();
+                    }
+                    showNexaurenChallenge();
+                });
+                content.addView(b, margins(0,5,0,0));
+            }
+        }
+
+        content.addView(featureAction("↻", "Novo desafio", "Gerar outra pergunta", v -> showNexaurenChallenge()),
+                margins(0,14,0,0));
+
+        TextView fun = text("Cada rodada usa músicas que já estão no aparelho. Nada é enviado para um serviço externo.", 11, R.color.text_secondary);
+        fun.setGravity(Gravity.CENTER);
+        content.addView(fun, margins(0,12,0,0));
+
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1,-1));
+    }
+
     private void showIntelligenceHub() {
         pageContainer.removeAllViews();
         ScrollView scroll = new ScrollView(this);
@@ -2183,6 +2250,7 @@ public class MainActivity extends ComponentActivity {
 
         addDrawerSection(items, "NEXAUREN");
         addDrawerItem(items, "★", "Journey • Conquistas", () -> { dialog.dismiss(); showJourney(); });
+        addDrawerItem(items, "🎮", "Desafio musical", () -> { dialog.dismiss(); showNexaurenChallenge(); });
         addDrawerItem(items, "◉", "Inteligência", () -> {
             dialog.dismiss();
             showIntelligenceHub();
@@ -2191,6 +2259,10 @@ public class MainActivity extends ComponentActivity {
         addDrawerSection(items, "PLAYER");
         addDrawerItem(items, "🚗", "Modo conduzir", () -> { dialog.dismiss(); showDrivingMode(); });
         addDrawerItem(items, "◷", "Temporizador", () -> { dialog.dismiss(); showSleepTimerDialog(); });
+        addDrawerItem(items, "⌁", "Bluetooth", () -> {
+            dialog.dismiss();
+            startActivity(new Intent(this, BluetoothActivity.class));
+        });
         addDrawerItem(items, "≋", "Equalizador", () -> {
             dialog.dismiss();
             startActivity(new Intent(this, EqualizerActivity.class));
