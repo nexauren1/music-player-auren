@@ -408,6 +408,27 @@ public final class AchievementManager {
                 "30 dias seguidos",
                 thirtyDayStreak));
 
+        result.add(new Badge(
+                "two_thousand_minutes",
+                "2000 minutos",
+                "Passe 2000 minutos de audição.",
+                "2000 min",
+                totalMs >= 2000L * 60_000L));
+
+        result.add(new Badge(
+                "fifty_artists",
+                "Mapa musical",
+                "Ouça músicas de 50 artistas diferentes.",
+                "50 artistas",
+                artists >= 50));
+
+        result.add(new Badge(
+                "fifty_days",
+                "Hábito criado",
+                "Tenha atividade em pelo menos 50 dias.",
+                "50 dias",
+                days >= 50));
+
         return result;
     }
 
@@ -444,6 +465,25 @@ public final class AchievementManager {
         }
 
         return false;
+    }
+
+    public static int level(Context context) {
+        int points = totalPoints(context);
+        return Math.max(1, Math.min(50, 1 + points / 100));
+    }
+
+    public static int levelProgress(Context context) {
+        int points = totalPoints(context);
+        return points % 100;
+    }
+
+    private static int totalPoints(Context context) {
+        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        int total = p.getInt(TOTAL, 0);
+        int unique = p.getStringSet(UNIQUE, new HashSet<>()).size();
+        int days = p.getStringSet(DAYS, new HashSet<>()).size();
+        long minutes = AurenAnalytics.summary(context).totalMs / 60_000L;
+        return total + unique * 3 + days * 5 + (int)Math.min(500, minutes / 2);
     }
 
     public static void clear(Context context) {
