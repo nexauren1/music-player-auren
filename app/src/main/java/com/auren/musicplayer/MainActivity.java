@@ -669,6 +669,20 @@ public class MainActivity extends ComponentActivity {
         return box;
     }
 
+    private View featureSectionTitle(String title) {
+        TextView t = text(title, 17, R.color.text_primary);
+        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        t.setPadding(0, dp(14), 0, dp(6));
+        return t;
+    }
+
+    private Track findTrack(long id) {
+        for (Track t : tracks) {
+            if (t.id == id) return t;
+        }
+        return null;
+    }
+
     private List<TrackInfo> analyticsTracks() {
         List<TrackInfo> result = new ArrayList<>();
         for (Track t : tracks) result.add(new TrackInfo(t.id, safeTitle(t), safeArtist(t), safeAlbum(t), safeGenre(t)));
