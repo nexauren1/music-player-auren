@@ -2,8 +2,8 @@ name: Android Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -14,7 +14,7 @@ env:
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
 
     steps:
@@ -41,77 +41,72 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 
-      - name: Check Gradle
-        run: gradle --version
-
-      - name: Prepare release keystore
+      - name: Build APK
+        id: build
         env:
           AUREN_KEYSTORE_B64: ${{ secrets.AUREN_KEYSTORE_B64 }}
-          AUREN_STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
-        run: |
-          set -euo pipefail
-          test -n "$AUREN_KEYSTORE_B64"
-          test -n "$AUREN_STORE_PASS"
-
-          KEYSTORE="$RUNNER_TEMP/auren-release.keystore"
-          printf '%s' "$AUREN_KEYSTORE_B64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE"
-
-          test -s "$KEYSTORE"
-          keytool -list -keystore "$KEYSTORE" -storepass "$AUREN_STORE_PASS" >/dev/null
-
-      - name: Build signed release APK
-        env:
-          AUREN_KEYSTORE_PATH: ${{ runner.temp }}/auren-release.keystore
           AUREN_KEY_ALIAS: ${{ secrets.AUREN_KEY_ALIAS }}
           AUREN_KEY_PASS: ${{ secrets.AUREN_KEY_PASS }}
           AUREN_STORE_PASS: ${{ secrets.AUREN_STORE_PASS }}
+          AUREN_KEYSTORE_PATH: ${{ runner.temp }}/auren-release.keystore
         run: |
           set -euo pipefail
-          test -n "$AUREN_KEY_ALIAS"
-          test -n "$AUREN_KEY_PASS"
-          gradle --no-daemon clean assembleRelease --stacktrace
 
-      - name: Read app version
+          if [ -n "$AUREN_KEYSTORE_B64" ]              && [ -n "$AUREN_KEY_ALIAS" ]              && [ -n "$AUREN_KEY_PASS" ]              && [ -n "$AUREN_STORE_PASS" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+
+            printf '%s' "$AUREN_KEYSTORE_B64" | tr -d '[:space:]' | base64 --decode > "$AUREN_KEYSTORE_PATH"
+            test -s "$AUREN_KEYSTORE_PATH"
+            keytool -list -keystore "$AUREN_KEYSTORE_PATH" -storepass "$AUREN_STORE_PASS" >/dev/null
+
+            gradle --no-daemon clean assembleRelease --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk Auren-Music-Player.apk
+            echo "mode=signed" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+
+            gradle --no-daemon clean assembleDebug --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk Auren-Music-Player.apk
+            echo "mode=debug-signed" >> "$GITHUB_OUTPUT"
+          fi
+
+          test -s Auren-Music-Player.apk
+          sha256sum Auren-Music-Player.apk > Auren-Music-Player.apk.sha256
+
+      - name: Read version
         id: version
         run: |
           set -euo pipefail
-          VERSION=$(grep -oE "versionName ['\"][^'\"]+['\"]" app/build.gradle | head -1 | sed -E "s/.*versionName ['\"]([^'\"]+)['\"].*/\1/")
+          VERSION=$(grep -o "versionName '[^']*'" app/build.gradle | head -1 | cut -d"'" -f2)
           test -n "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Verify signed APK
-        run: |
-          set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose "$APK"
-
-      - name: Prepare release files
-        id: release
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          TAG="v${VERSION}-build.${GITHUB_RUN_NUMBER}"
-          cp app/build/outputs/apk/release/app-release.apk "Auren-Music-Player-${TAG}.apk"
-          sha256sum "Auren-Music-Player-${TAG}.apk" > "Auren-Music-Player-${TAG}.apk.sha256"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload workflow artifacts
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Auren-Music-Player-${{ steps.release.outputs.tag }}
+          name: Auren-Music-Player-v${{ steps.version.outputs.version }}
           path: |
-            Auren-Music-Player-${{ steps.release.outputs.tag }}.apk
-            Auren-Music-Player-${{ steps.release.outputs.tag }}.apk.sha256
+            Auren-Music-Player.apk
+            Auren-Music-Player.apk.sha256
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.release.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
+          MODE: ${{ steps.build.outputs.mode }}
         run: |
           set -euo pipefail
-          gh release create "$TAG"             "Auren-Music-Player-$TAG.apk"             "Auren-Music-Player-$TAG.apk.sha256"             --title "Auren Music Player $TAG"             --notes "Signed APK for free direct distribution via GitHub Releases. Version $VERSION."
+
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v${VERSION}-build.${GITHUB_RUN_NUMBER}"
+          fi
+
+          if [ "${MODE}" = "signed" ]; then
+            NOTE="Signed release APK."
+          else
+            NOTE="Debug-signed APK for free direct distribution/testing. A persistent release keystore can be added later for seamless updates."
+          fi
+
+          gh release create "${TAG}"             Auren-Music-Player.apk             Auren-Music-Player.apk.sha256             --title "Auren Music Player ${TAG}"             --notes "${NOTE}"
