@@ -5,6 +5,9 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.content.Intent;
+import android.net.Uri;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -58,9 +61,23 @@ public class SettingsActivity extends ComponentActivity {
 
         content.addView(infoCard(
                 "Atualizações",
-                "As versões oficiais do Auren serão distribuídas pelo Google Play.",
-                "Não há instalador APK automático dentro do aplicativo."
+                "Por enquanto, o Auren é distribuído gratuitamente por GitHub Releases.",
+                "Abra a página de downloads para obter a versão mais recente."
         ));
+
+        Button downloads = new Button(this);
+        downloads.setText("Abrir página de downloads");
+        downloads.setTextSize(14);
+        downloads.setAllCaps(false);
+        downloads.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        downloads.setTextColor(Color.WHITE);
+        downloads.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+        downloads.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://github.com/nexauren1/music-player-auren/releases/latest"));
+            startActivity(intent);
+        });
+        content.addView(downloads, margins(0, 10, 0, 0));
 
         content.addView(infoCard(
                 "Reprodução em segundo plano",
