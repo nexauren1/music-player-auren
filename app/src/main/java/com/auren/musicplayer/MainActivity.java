@@ -55,6 +55,7 @@ import java.util.Set;
 import java.util.HashSet;
 
 public class MainActivity extends ComponentActivity {
+    private String appliedThemeKey;
     private static final int MUSIC_PERMISSION = 41;
     private static final int NOTIFICATION_PERMISSION = 42;
     private final List<Track> tracks = new ArrayList<>();
@@ -120,6 +121,8 @@ public class MainActivity extends ComponentActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ThemeManager.applyWindow(this);
+        appliedThemeKey = themeKey();
         buildShell();
         connectPlaybackController();
         requestMusicPermission();
@@ -146,9 +149,25 @@ public class MainActivity extends ComponentActivity {
         }, Runnable::run);
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        ThemeManager.applyWindow(this);
+        String key = themeKey();
+        if (appliedThemeKey != null && !appliedThemeKey.equals(key) && !isFinishing()) {
+            appliedThemeKey = key;
+            recreate();
+        } else if (appliedThemeKey == null) {
+            appliedThemeKey = key;
+        }
+    }
+
+    private String themeKey() {
+        return ThemeManager.hex(ThemeManager.accent(this)) + ":" + ThemeManager.isDark(this);
+    }
+
     private void buildShell() {
         LinearLayout root = column();
-        root.setBackgroundColor(getColor(R.color.surface));
+        root.setBackgroundColor(ThemeManager.resolve(this, R.color.surface));
 
         root.addView(buildTopBar());
 
@@ -156,7 +175,9 @@ public class MainActivity extends ComponentActivity {
         root.addView(pageContainer, new LinearLayout.LayoutParams(-1, 0, 1));
 
         miniContainer = buildMiniPlayer();
-        root.addView(miniContainer, new LinearLayout.LayoutParams(-1, dp(70)));
+        LinearLayout.LayoutParams miniLp = new LinearLayout.LayoutParams(-1, dp(78));
+        miniLp.setMargins(dp(8), dp(4), dp(8), dp(4));
+        root.addView(miniContainer, miniLp);
         root.addView(buildBottomNavigation());
         setContentView(root);
         showHome();
@@ -165,11 +186,11 @@ public class MainActivity extends ComponentActivity {
         LinearLayout bar = row();
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(12), dp(8), dp(12), dp(8));
-        bar.setBackgroundColor(Color.WHITE);
+        bar.setBackgroundColor(ThemeManager.card(this));
         bar.setElevation(dp(2));
 
         ImageButton menu = iconButton(android.R.drawable.ic_menu_sort_by_size, "Abrir menu");
-        DrawableCompat.setTint(menu.getDrawable(), getColor(R.color.auren_primary));
+        DrawableCompat.setTint(menu.getDrawable(), ThemeManager.resolve(this, R.color.auren_primary));
         menu.setOnClickListener(v -> showAppMenu(menu));
         bar.addView(menu, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
@@ -178,7 +199,7 @@ public class MainActivity extends ComponentActivity {
         bar.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1));
 
         ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Pesquisar música");
-        DrawableCompat.setTint(search.getDrawable(), getColor(R.color.text_primary));
+        DrawableCompat.setTint(search.getDrawable(), ThemeManager.resolve(this, R.color.text_primary));
         search.setOnClickListener(v -> showSearchDialog());
         bar.addView(search, new LinearLayout.LayoutParams(dp(44), dp(44)));
         return bar;
@@ -186,7 +207,7 @@ public class MainActivity extends ComponentActivity {
 
 
     private View buildHomeHero() {
-        LinearLayout card = rounded(getColor(R.color.auren_primary), 26);
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.auren_primary), 26);
         card.setPadding(dp(16), dp(16), dp(16), dp(16));
         card.setElevation(dp(4));
 
@@ -502,7 +523,8 @@ public class MainActivity extends ComponentActivity {
         LinearLayout nav = row();
         nav.setGravity(Gravity.CENTER);
         nav.setPadding(dp(8), dp(5), dp(8), dp(8));
-        nav.setBackgroundColor(Color.WHITE);
+        nav.setBackground(roundDrawable(ThemeManager.card(this), 22));
+        nav.setElevation(dp(5));
         homeTab = navItem("HOME", "Início", v -> showHome());
         libraryTab = navItem("LIBRARY", "Biblioteca", v -> showLibrary());
         playlistTab = navItem("PLAYLIST", "Playlists", v -> showPlaylists());
@@ -527,8 +549,8 @@ public class MainActivity extends ComponentActivity {
     }
     private void setActiveTab(TextView active) {
         if (homeTab == null) return;
-        int inactive = getColor(R.color.text_secondary);
-        int selected = getColor(R.color.auren_primary);
+        int inactive = ThemeManager.resolve(this, R.color.text_secondary);
+        int selected = ThemeManager.resolve(this, R.color.auren_primary);
         homeTab.setTextColor(inactive);
         libraryTab.setTextColor(inactive);
         playlistTab.setTextColor(inactive);
@@ -544,11 +566,11 @@ public class MainActivity extends ComponentActivity {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         LinearLayout root = column();
-        root.setBackgroundColor(getColor(R.color.surface));
+        root.setBackgroundColor(ThemeManager.resolve(this, R.color.surface));
 
         LinearLayout header = column();
         header.setPadding(dp(20), dp(28), dp(20), dp(20));
-        header.setBackgroundColor(getColor(R.color.auren_primary));
+        header.setBackgroundColor(ThemeManager.resolve(this, R.color.auren_primary));
 
         TextView brand = text("AUREN", 25, android.R.color.white);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -682,7 +704,7 @@ public class MainActivity extends ComponentActivity {
         mini.setElevation(dp(10));
 
         View progress = new View(this);
-        progress.setBackgroundColor(getColor(R.color.auren_primary));
+        progress.setBackgroundColor(ThemeManager.resolve(this, R.color.auren_primary));
         mini.addView(progress, new LinearLayout.LayoutParams(-1, dp(2)));
 
         LinearLayout row = row();
@@ -712,18 +734,18 @@ public class MainActivity extends ComponentActivity {
 
         ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
         functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
-        DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
+        DrawableCompat.setTint(functions.getDrawable(), ThemeManager.resolve(this, R.color.text_primary));
         functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
         row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));
 
         ImageButton next = iconButton(android.R.drawable.ic_media_next, "Próxima música");
         next.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
-        DrawableCompat.setTint(next.getDrawable(), getColor(R.color.text_primary));
+        DrawableCompat.setTint(next.getDrawable(), ThemeManager.resolve(this, R.color.text_primary));
         next.setOnClickListener(v -> nextTrackInPlayer());
         row.addView(next, new LinearLayout.LayoutParams(dp(42), dp(52)));
 
         miniPlay = iconButton(android.R.drawable.ic_media_play, "Reproduzir ou pausar");
-        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ThemeManager.resolve(this, R.color.auren_primary)));
         DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
         miniPlay.setPadding(dp(12), dp(12), dp(12), dp(12));
         miniPlay.setOnClickListener(v -> togglePlayback());
@@ -762,7 +784,7 @@ public class MainActivity extends ComponentActivity {
     }
     private View buildNowPlayingView() {
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(getColor(R.color.surface));
+        scroll.setBackgroundColor(ThemeManager.resolve(this, R.color.surface));
 
         LinearLayout root = column();
         root.setPadding(dp(20), dp(16), dp(20), dp(22));
@@ -872,7 +894,7 @@ public class MainActivity extends ComponentActivity {
                 player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
                 "Reproduzir ou pausar");
         playPause.setBackgroundTintList(
-                android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+                android.content.res.ColorStateList.valueOf(ThemeManager.resolve(this, R.color.auren_primary)));
         DrawableCompat.setTint(playPause.getDrawable(), Color.WHITE);
         playPause.setPadding(dp(18), dp(18), dp(18), dp(18));
         playPause.setOnClickListener(v -> {
@@ -1931,7 +1953,7 @@ public class MainActivity extends ComponentActivity {
         ImageView image = new ImageView(this);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(getColor(R.color.accent_soft));
+        bg.setColor(ThemeManager.resolve(this, R.color.accent_soft));
         bg.setCornerRadius(dp(15));
         image.setBackground(bg);
         image.setImageResource(android.R.drawable.ic_media_play);
@@ -1945,7 +1967,7 @@ public class MainActivity extends ComponentActivity {
         button.setContentDescription(description);
         button.setBackgroundColor(Color.TRANSPARENT);
         button.setPadding(dp(10), dp(10), dp(10), dp(10));
-        DrawableCompat.setTint(button.getDrawable(), getColor(R.color.text_primary));
+        DrawableCompat.setTint(button.getDrawable(), ThemeManager.resolve(this, R.color.text_primary));
         return button;
     }
 
