@@ -40,13 +40,15 @@ public final class ThemeManager {
         boolean dark = isDark(context);
         if (resourceId == R.color.auren_primary) return accent(context);
         if (resourceId == R.color.auren_secondary) return blend(accent(context), Color.WHITE, 0.35f);
-        if (resourceId == R.color.surface) return dark ? Color.rgb(15, 18, 23) : Color.rgb(246, 248, 252);
+        if (resourceId == R.color.surface) return dark
+                ? blend(accent(context), Color.rgb(15, 18, 23), 0.04f)
+                : blend(accent(context), Color.rgb(246, 248, 252), 0.02f);
         if (resourceId == R.color.surface_alt) return dark
                 ? blend(accent(context), Color.rgb(25, 30, 38), 0.07f)
                 : blend(accent(context), Color.rgb(238, 241, 247), 0.035f);
         if (resourceId == R.color.card) return dark
-                ? blend(accent(context), Color.rgb(27, 32, 40), 0.10f)
-                : blend(accent(context), Color.WHITE, 0.035f);
+                ? blend(accent(context), Color.rgb(27, 32, 40), 0.14f)
+                : blend(accent(context), Color.WHITE, 0.045f);
         if (resourceId == R.color.text_primary) return dark ? Color.rgb(244, 246, 249) : Color.rgb(17, 24, 39);
         if (resourceId == R.color.text_secondary) return dark ? Color.rgb(169, 179, 191) : Color.rgb(102, 112, 133);
         if (resourceId == R.color.line) return dark ? Color.rgb(48, 56, 68) : Color.rgb(229, 231, 235);
@@ -64,7 +66,19 @@ public final class ThemeManager {
     }
 
     public static int card(Context context) {
-        return isDark(context) ? Color.rgb(27, 32, 40) : Color.WHITE;
+        return isDark(context)
+                ? blend(accent(context), Color.rgb(27, 32, 40), 0.14f)
+                : blend(accent(context), Color.WHITE, 0.045f);
+    }
+
+    public static int textOnAccent(Context context) {
+        int c = accent(context);
+        double y = 0.299 * Color.red(c) + 0.587 * Color.green(c) + 0.114 * Color.blue(c);
+        return y < 165 ? Color.WHITE : Color.rgb(17, 24, 39);
+    }
+
+    public static int artworkTint(Context context, int artworkColor) {
+        return blend(artworkColor, accent(context), 0.35f);
     }
 
     public static boolean useDarkSystemBars(Context context) {
