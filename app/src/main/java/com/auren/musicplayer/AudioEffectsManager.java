@@ -25,7 +25,7 @@ public final class AudioEffectsManager {
             equalizer.setEnabled(true);
             audioSessionId = sessionId;
             applySaved(context);
-        } catch (RuntimeException | IllegalArgumentException ignored) {
+        } catch (RuntimeException ignored) {
             equalizer = null;
             audioSessionId = 0;
         }
