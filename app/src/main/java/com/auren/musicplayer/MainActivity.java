@@ -86,9 +86,6 @@ public class MainActivity extends ComponentActivity {
         public void onIsPlayingChanged(boolean isPlaying) {
             runOnUiThread(() -> {
                 updateMiniPlayer();
-                if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
-                    refreshNowPlaying();
-                }
             });
         }
     };
@@ -106,7 +103,7 @@ public class MainActivity extends ComponentActivity {
     private boolean userDragging;
     private float playbackSpeed = 1.0f;
     private float playbackPitch = 1.0f;
-    private final List<Track> playFila = new ArrayList<>();
+    private final List<Track> playQueue = new ArrayList<>();
     private long sleepTimerEndMs = 0L;
     private boolean sleepAtTrackEnd;
     private long abStartMs = -1L;
@@ -755,10 +752,10 @@ public class MainActivity extends ComponentActivity {
         nowPlayingDialog.show();
         if (window != null) window.setLayout(-1, -1);
     }
-
     private View buildNowPlayingView() {
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(getColor(R.color.surface));
+
         LinearLayout root = column();
         root.setPadding(dp(20), dp(16), dp(20), dp(22));
 
@@ -766,15 +763,17 @@ public class MainActivity extends ComponentActivity {
         ImageButton close = iconButton(android.R.drawable.ic_menu_close_clear_cancel, "Fechar player");
         close.setOnClickListener(v -> closeNowPlaying());
         top.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView label = text("NOW PLAYING", 12, R.color.auren_primary);
+
+        TextView label = text("A TOCAR", 12, R.color.auren_primary);
         label.setGravity(Gravity.CENTER);
         label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         top.addView(label, new LinearLayout.LayoutParams(0, dp(48), 1));
+
         ImageButton more = iconButton(android.R.drawable.ic_menu_more, "Opções do player");
         more.setOnClickListener(v -> {
             PopupMenu popup = new PopupMenu(this, more);
             popup.getMenu().add("Reproduzir novamente");
-            popup.getMenu().add(isFavoritar(currentTrack) ? "Remover dos favoritos" : "Adicionar aos favoritos");
+            popup.getMenu().add(isFavorite(currentTrack) ? "Remover dos favoritos" : "Adicionar aos favoritos");
             popup.getMenu().add("Aleatório");
             popup.getMenu().add("Efeitos: velocidade e pitch");
             popup.getMenu().add("Fechar reprodução");
@@ -783,36 +782,11 @@ public class MainActivity extends ComponentActivity {
                 if (action.equals("Reproduzir novamente")) {
                     player.seekTo(0);
                     player.play();
-                    refreshNowPlaying();
                 } else if (action.contains("favoritos")) {
-                    setFavoritar(currentTrack, !isFavoritar(currentTrack));
+                    setFavorite(currentTrack, !isFavorite(currentTrack));
                     updateMiniPlayer();
-                    refreshNowPlaying();
                 } else if (action.equals("Aleatório")) {
                     shufflePlay();
-                    refreshNowPlaying();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
                     showEffectsDialog();
                 } else {
@@ -829,7 +803,7 @@ public class MainActivity extends ComponentActivity {
         hero.setImageURI(currentTrack.albumArtUri());
         if (hero.getDrawable() == null) hero.setImageResource(android.R.drawable.ic_media_play);
         hero.setPadding(0, 0, 0, 0);
-        hero.setElevation(dp(10));
+        hero.setElevation(dp(8));
         LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, dp(300));
         heroParams.setMargins(0, dp(18), 0, dp(22));
         root.addView(hero, heroParams);
@@ -843,11 +817,16 @@ public class MainActivity extends ComponentActivity {
         names.addView(artist, margins(0, 3, 0, 0));
         titleRow.addView(names, new LinearLayout.LayoutParams(0, dp(62), 1));
 
-        ImageButton favorite = iconButton(isFavoritar(currentTrack) ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off, "Favoritar");
+        ImageButton favorite = iconButton(
+                isFavorite(currentTrack) ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off,
+                "Favoritar");
         favorite.setOnClickListener(v -> {
-            setFavoritar(currentTrack, !isFavoritar(currentTrack));
-            favorite.setImageResource(isFavoritar(currentTrack) ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off);
-            showBibliotecaIfNeeded();
+            setFavorite(currentTrack, !isFavorite(currentTrack));
+            favorite.setImageResource(
+                    isFavorite(currentTrack)
+                            ? android.R.drawable.btn_star_big_on
+                            : android.R.drawable.btn_star_big_off);
+            showLibraryIfNeeded();
         });
         titleRow.addView(favorite, new LinearLayout.LayoutParams(dp(52), dp(62)));
         root.addView(titleRow);
@@ -858,7 +837,9 @@ public class MainActivity extends ComponentActivity {
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                 userDragging = fromUser;
-                if (fromUser && player.getDuration() > 0) player.seekTo(player.getDuration() * progress / 1000L);
+                if (fromUser && player != null && player.getDuration() > 0) {
+                    player.seekTo(player.getDuration() * progress / 1000L);
+                }
             }
             @Override public void onStartTrackingTouch(SeekBar bar) { userDragging = true; }
             @Override public void onStopTrackingTouch(SeekBar bar) { userDragging = false; }
@@ -878,29 +859,39 @@ public class MainActivity extends ComponentActivity {
         ImageButton previous = iconButton(android.R.drawable.ic_media_previous, "Anterior");
         previous.setOnClickListener(v -> previousTrackInPlayer());
         controls.addView(previous, new LinearLayout.LayoutParams(dp(64), dp(64)));
-        ImageButton playPause = iconButton(player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, "Reproduzir ou pausar");
-        playPause.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+
+        ImageButton playPause = iconButton(
+                player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                "Reproduzir ou pausar");
+        playPause.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
         DrawableCompat.setTint(playPause.getDrawable(), Color.WHITE);
         playPause.setPadding(dp(18), dp(18), dp(18), dp(18));
         playPause.setOnClickListener(v -> {
             togglePlayback();
-            playPause.setImageResource(player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+            playPause.setImageResource(
+                    player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
             DrawableCompat.setTint(playPause.getDrawable(), Color.WHITE);
         });
         controls.addView(playPause, new LinearLayout.LayoutParams(dp(76), dp(76)));
-        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Next");
+
+        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Próxima música");
         next.setOnClickListener(v -> nextTrackInPlayer());
         controls.addView(next, new LinearLayout.LayoutParams(dp(64), dp(64)));
         root.addView(controls, margins(0, 8, 0, 0));
 
         LinearLayout extras = row();
         extras.setGravity(Gravity.CENTER);
-        extras.addView(playerAction("↶", "Repetir", v -> player.seekTo(0)), new LinearLayout.LayoutParams(0, dp(58), 1));
-        extras.addView(playerAction("⇄", "Aleatório", v -> shufflePlay()), new LinearLayout.LayoutParams(0, dp(58), 1));
-        extras.addView(playerAction("☰", "Fila", v -> showFilaDialog()), new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("↶", "Repetir", v -> {
+            if (player != null) player.seekTo(0);
+        }), new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("⇄", "Aleatório", v -> shufflePlay()),
+                new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("☰", "Fila", v -> showQueueDialog()),
+                new LinearLayout.LayoutParams(0, dp(58), 1));
         root.addView(extras, margins(0, 8, 0, 0));
 
-        TextView hint = text("Auren • Music that moves with you", 11, R.color.text_secondary);
+        TextView hint = text("Auren • Música que acompanha você", 11, R.color.text_secondary);
         hint.setGravity(Gravity.CENTER);
         root.addView(hint, margins(0, 10, 0, 0));
 
@@ -913,7 +904,6 @@ public class MainActivity extends ComponentActivity {
         popup.getMenu().add("Temporizador de sono");
         popup.getMenu().add("Repetição");
         popup.getMenu().add("Repetir trecho A-B");
-        popup.getMenu().add("Equalizador");
         popup.getMenu().add("Ordenar biblioteca");
         popup.getMenu().add("Atualizar biblioteca");
         popup.getMenu().add("Efeitos");
@@ -924,7 +914,7 @@ public class MainActivity extends ComponentActivity {
         popup.setOnMenuItemClickListener(item -> {
             String action = item.getTitle().toString();
             if (action.equals("Fila de reprodução")) {
-                showFilaDialog();
+                showQueueDialog();
             } else if (action.equals("Temporizador de sono")) {
                 showSleepTimerDialog();
             } else if (action.equals("Repetição")) {
@@ -954,6 +944,7 @@ public class MainActivity extends ComponentActivity {
         });
         popup.show();
     }
+
 
 
 
@@ -1041,8 +1032,8 @@ public class MainActivity extends ComponentActivity {
         refreshNowPlaying();
     }
     private void nextTrackInPlayer() {
-        if (!playFila.isEmpty()) {
-            Track next = playFila.remove(0);
+        if (!playQueue.isEmpty()) {
+            Track next = playQueue.remove(0);
             if (sleepAtTrackEnd) {
                 sleepAtTrackEnd = false;
                 sleepTimerEndMs = 0L;
@@ -1267,23 +1258,23 @@ public class MainActivity extends ComponentActivity {
         if (pageContainer != null) showInício();
     }
 
-    private void showFilaDialog() {
+    private void showQueueDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle("Fila de reprodução");
-        if (playFila.isEmpty()) {
+        if (playQueue.isEmpty()) {
             builder.setMessage("A fila está vazia. Use ⋮ em uma música e escolha Adicionar à fila ou Reproduzir a seguir.");
         } else {
-            String[] labels = new String[playFila.size()];
-            for (int i = 0; i < playFila.size(); i++) {
-                Track track = playFila.get(i);
+            String[] labels = new String[playQueue.size()];
+            for (int i = 0; i < playQueue.size(); i++) {
+                Track track = playQueue.get(i);
                 labels[i] = (i + 1) + ". " + safeTitle(track) + " — " + safeArtist(track);
             }
             builder.setItems(labels, (dialog, which) -> {
-                Track selected = playFila.remove(which);
+                Track selected = playQueue.remove(which);
                 play(selected);
                 refreshNowPlaying();
             });
         }
-        builder.setNeutralButton("Limpar", (d, w) -> playFila.clear());
+        builder.setNeutralButton("Limpar", (d, w) -> playQueue.clear());
         builder.setNegativeButton("Fechar", null);
         builder.show();
     }
@@ -1657,9 +1648,9 @@ public class MainActivity extends ComponentActivity {
     }
     private void addTrackToFila(Track track, boolean next) {
         if (track == null) return;
-        playFila.remove(track);
-        if (next) playFila.add(0, track);
-        else playFila.add(track);
+        playQueue.remove(track);
+        if (next) playQueue.add(0, track);
+        else playQueue.add(track);
     }
 
 
@@ -1890,7 +1881,7 @@ public class MainActivity extends ComponentActivity {
         Toast.makeText(this, "Mais tocadas is ranked on the Início screen.", Toast.LENGTH_SHORT).show();
     }
 
-    private void showBibliotecaIfNeeded() {
+    private void showLibraryIfNeeded() {
         // Favoritar state is persisted; the current page remains unchanged.
     }
 
