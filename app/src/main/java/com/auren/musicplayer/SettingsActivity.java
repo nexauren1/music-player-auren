@@ -57,7 +57,7 @@ public class SettingsActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(18), dp(18), dp(18), dp(28));
 
-        addSection(content, "APARÊNCIA", "Personalize a identidade visual da Nexauren.");
+        addSection(content, "APARÊNCIA", "Personalize a identidade visual do Music Player - Nexauren.");
 
         LinearLayout themeCard = card();
         TextView themeTitle = text("Tema", 16, ThemeManager.resolve(this, R.color.text_primary));
@@ -280,20 +280,33 @@ public class SettingsActivity extends ComponentActivity {
                 .setMessage("Isto remove contagens de reprodução e o histórico de recentes. Favoritos e playlists não serão removidos.")
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Limpar", (d, w) -> {
-                    android.content.SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
-                    android.content.SharedPreferences.Editor editor = prefs.edit();
-                    java.util.Set<String> keys = prefs.getAll().keySet();
+                    android.content.SharedPreferences prefs =
+                            getSharedPreferences("auren_player", MODE_PRIVATE);
+                    android.content.SharedPreferences.Editor editor =
+                            prefs.edit();
+                    java.util.Set<String> keys =
+                            prefs.getAll().keySet();
+
                     for (String key : keys) {
-                        if (key.startsWith("play_count_") || key.startsWith("eq_band_")
+                        if (key.startsWith("play_count_")
+                                || key.startsWith("eq_band_")
+                                || key.startsWith("track_position_")
                                 || key.equals("play_counts_v2")
                                 || key.equals("recent_tracks")
                                 || key.equals("last_played_id")
                                 || key.equals("last_played_at")
+                                || key.equals("resume_id")
+                                || key.equals("resume_position")
+                                || key.equals("resume_playing")
+                                || key.equals("album_complete")
                                 || key.equals("stats_schema")) {
                             editor.remove(key);
                         }
                     }
+
                     editor.apply();
+                    AurenAnalytics.clear(this);
+                    AchievementManager.clear(this);
                     recreate();
                 })
                 .show();
