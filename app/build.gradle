@@ -10,8 +10,8 @@ android {
         applicationId 'com.auren.musicplayer'
         minSdk 26
         targetSdk 36
-        versionCode 354
-        versionName '3.2.0'
+        versionCode 355
+        versionName '3.2.1'
     }
 
     buildFeatures {
