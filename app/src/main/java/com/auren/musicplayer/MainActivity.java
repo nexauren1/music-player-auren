@@ -262,21 +262,27 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout info = column();
         info.setPadding(dp(14), 0, 0, 0);
+        int heroTextColor = ThemeManager.textOnAccent(this);
         TextView eyebrow = text("AGORA NO NEXAUREN", 10, android.R.color.white);
+        eyebrow.setTextColor(heroTextColor);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         info.addView(eyebrow);
 
         String heroTitle = miniTitle == null ? "A música move você" : miniTitle.getText().toString();
         if (heroTitle.trim().isEmpty()) heroTitle = "A música move você";
         TextView title = text(heroTitle, 20, android.R.color.white);
+        title.setTextColor(heroTextColor);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         info.addView(title, margins(0, 4, 0, 2));
 
         String heroArtist = miniArtist == null ? "Descubra, ouça e aproveite" : miniArtist.getText().toString();
         if (heroArtist.trim().isEmpty()) heroArtist = "Descubra, ouça e aproveite";
-        info.addView(text(heroArtist, 12, android.R.color.white));
+        TextView artistText = text(heroArtist, 12, android.R.color.white);
+        artistText.setTextColor(heroTextColor);
+        info.addView(artistText);
 
         TextView action = text("Abrir reprodução  ›", 12, android.R.color.white);
+        action.setTextColor(heroTextColor);
         action.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         info.addView(action, margins(0, 12, 0, 0));
         media.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
@@ -1061,12 +1067,16 @@ public class MainActivity extends ComponentActivity {
         header.setPadding(dp(20), dp(28), dp(20), dp(20));
         header.setBackgroundColor(ThemeManager.resolve(this, R.color.auren_primary));
 
+        int drawerTextColor = ThemeManager.textOnAccent(this);
         TextView brand = text("NEXAUREN", 25, android.R.color.white);
+        brand.setTextColor(drawerTextColor);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         header.addView(brand);
         TextView subtitle = text("Music Player - Nexauren", 13, android.R.color.white);
+        subtitle.setTextColor(drawerTextColor);
         header.addView(subtitle, margins(0, 2, 0, 0));
         TextView version = text("Versão " + BuildConfig.VERSION_NAME, 11, android.R.color.white);
+        version.setTextColor(drawerTextColor);
         header.addView(version, margins(0, 12, 0, 0));
         root.addView(header);
 
