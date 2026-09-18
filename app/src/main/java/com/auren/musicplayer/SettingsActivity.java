@@ -135,7 +135,7 @@ public class SettingsActivity extends ComponentActivity {
         LinearLayout data = card();
         data.addView(text("Estatísticas de reprodução", 16, ThemeManager.resolve(this, R.color.text_primary)));
         data.addView(text(
-                "Mais tocadas, recentes, favoritos, playlists e preferências ficam guardados no armazenamento interno do Auren.",
+                "Mais tocadas, recentes, favoritos, playlists e preferências ficam guardadas no armazenamento interno da Nexauren.",
                 13, ThemeManager.resolve(this, R.color.text_secondary)), margins(0, 5, 0, 10));
         Button reset = button("Limpar estatísticas");
         reset.setOnClickListener(v -> confirmReset());
