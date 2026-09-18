@@ -120,6 +120,14 @@ jobs:
             Nexauren-Music-Player.apk
             Nexauren-Music-Player.apk.sha256
 
+      - name: Sync release tag to exact commit
+        if: startsWith(github.ref, 'refs/heads/release/')
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:refs/tags/$RELEASE_TAG" --force
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/release/')
         env:
@@ -128,12 +136,20 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
-          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || true
-          gh release create "$RELEASE_TAG" \
-            Nexauren-Music-Player.apk \
-            Nexauren-Music-Player.apk.sha256 \
-            --title "Nexauren Music Player $VERSION" \
-            --generate-notes
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              Nexauren-Music-Player.apk \
+              Nexauren-Music-Player.apk.sha256 \
+              --clobber
+            gh release edit "$RELEASE_TAG" \
+              --title "Nexauren Music Player $VERSION"
+          else
+            gh release create "$RELEASE_TAG" \
+              Nexauren-Music-Player.apk \
+              Nexauren-Music-Player.apk.sha256 \
+              --title "Nexauren Music Player $VERSION" \
+              --generate-notes
+          fi
 
       - name: Build summary
         if: always()
