@@ -32,8 +32,19 @@ public final class AurenAnalytics {
         String month = monthKey(now);
         String hour = String.valueOf(now.get(Calendar.HOUR_OF_DAY));
 
+        Set<String> artists = new HashSet<>(p.getStringSet("unique_artists", new HashSet<>()));
+        if (artist != null && !artist.trim().isEmpty()) artists.add(artist.trim());
+
+        Calendar hourNow = Calendar.getInstance();
+        int hourNowValue = hourNow.get(Calendar.HOUR_OF_DAY);
+        int night = p.getInt("night_plays", 0);
+        if (hourNowValue >= 20 || hourNowValue < 5) night++;
+
         p.edit()
                 .putInt("plays_total", p.getInt("plays_total", 0) + 1)
+                .putInt("plays_track_" + trackId, p.getInt("plays_track_" + trackId, 0) + 1)
+                .putStringSet("unique_artists", artists)
+                .putInt("night_plays", night)
                 .putInt("plays_day_" + day, p.getInt("plays_day_" + day, 0) + 1)
                 .putInt("plays_week_" + week, p.getInt("plays_week_" + week, 0) + 1)
                 .putInt("plays_month_" + month, p.getInt("plays_month_" + month, 0) + 1)
@@ -62,6 +73,9 @@ public final class AurenAnalytics {
         long weekMs = p.getLong("time_week_" + week, 0L) + safeMs;
         long monthMs = p.getLong("time_month_" + month, 0L) + safeMs;
         long trackMs = p.getLong("time_track_" + trackId, 0L) + safeMs;
+        long trackDayMs = p.getLong("time_day_" + day + "_" + trackId, 0L) + safeMs;
+        long trackWeekMs = p.getLong("time_week_" + week + "_" + trackId, 0L) + safeMs;
+        long trackMonthMs = p.getLong("time_month_" + month + "_" + trackId, 0L) + safeMs;
 
         String sessionTracks = p.getString("session_tracks", "");
         long sessionStart = p.getLong("session_start", 0L);
@@ -75,6 +89,9 @@ public final class AurenAnalytics {
                 .putLong("time_week_" + week, weekMs)
                 .putLong("time_month_" + month, monthMs)
                 .putLong("time_track_" + trackId, trackMs)
+                .putLong("time_day_" + day + "_" + trackId, trackDayMs)
+                .putLong("time_week_" + week + "_" + trackId, trackWeekMs)
+                .putLong("time_month_" + month + "_" + trackId, trackMonthMs)
                 .putString("artist_" + trackId, safe(artist));
 
         if (sessionStart == 0L || (sessionLast > 0L && nowMs - sessionLast > SESSION_GAP_MS)) {
@@ -126,6 +143,36 @@ public final class AurenAnalytics {
 
     public static int hourScore(Context context, long trackId, int hour) {
         return prefs(context).getInt("plays_hour_" + Math.max(0, Math.min(23, hour)) + "_" + trackId, 0);
+    }
+
+    public static int trackPlayCount(Context context, long trackId) {
+        return prefs(context).getInt("plays_track_" + trackId, 0);
+    }
+
+    public static int uniqueArtists(Context context) {
+        return prefs(context).getStringSet("unique_artists", new HashSet<>()).size();
+    }
+
+    public static int nightPlays(Context context) {
+        return prefs(context).getInt("night_plays", 0);
+    }
+
+    public static List<TrackScore> topTracks(Context context, List<MainActivity.TrackInfo> tracks,
+                                              String period, int limit) {
+        SharedPreferences p = prefs(context);
+        Calendar now = Calendar.getInstance();
+        String key = period == null ? "all" : period;
+        List<TrackScore> result = new ArrayList<>();
+        for (MainActivity.TrackInfo t : tracks) {
+            long ms;
+            if ("today".equals(key)) ms = p.getLong("time_day_" + dayKey(now) + "_" + t.id, 0L);
+            else if ("week".equals(key)) ms = p.getLong("time_week_" + weekKey(now) + "_" + t.id, 0L);
+            else if ("month".equals(key)) ms = p.getLong("time_month_" + monthKey(now) + "_" + t.id, 0L);
+            else ms = p.getLong("time_track_" + t.id, 0L);
+            if (ms > 0L) result.add(new TrackScore(t.id, t.title, t.artist, ms));
+        }
+        result.sort((a, b) -> Long.compare(b.timeMs, a.timeMs));
+        return result.size() > limit ? new ArrayList<>(result.subList(0, limit)) : result;
     }
 
     public static List<TrackScore> topTracks(Context context, List<MainActivity.TrackInfo> tracks, int limit) {
