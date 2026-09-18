@@ -1592,7 +1592,7 @@ public class MainActivity extends ComponentActivity {
         for (Track track : tracks) {
             if (currentTrack != null && track.id == currentTrack.id) continue;
             if (!result.contains(track)) result.add(track);
-            if (resultado.size() >= 8) break;
+            if (result.size() >= 8) break;
         }
         return result;
     }
