@@ -59,7 +59,7 @@ public final class AudioEffectsManager {
         if (equalizer == null) return;
         try {
             equalizer.setBandLevel((short) band, (short) Math.max(getMinLevel(), Math.min(getMaxLevel(), level)));
-        } catch (RuntimeException | IllegalArgumentException ignored) {
+        } catch (RuntimeException ignored) {
         }
     }
 
@@ -67,7 +67,7 @@ public final class AudioEffectsManager {
         if (equalizer == null) return 0;
         try {
             return equalizer.getCenterFreq((short) band) / 1000;
-        } catch (RuntimeException | IllegalArgumentException ignored) {
+        } catch (RuntimeException ignored) {
             return 0;
         }
     }
@@ -137,7 +137,7 @@ public final class AudioEffectsManager {
             int level = savedLevel(context, i);
             try {
                 equalizer.setBandLevel((short) i, (short) Math.max(getMinLevel(), Math.min(getMaxLevel(), level)));
-            } catch (RuntimeException | IllegalArgumentException ignored) {}
+            } catch (RuntimeException ignored) {}
         }
     }
 
