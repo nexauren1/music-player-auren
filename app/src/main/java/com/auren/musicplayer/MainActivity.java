@@ -95,6 +95,27 @@ public class MainActivity extends ComponentActivity {
                 updateMiniPlayer();
             });
         }
+
+        @Override
+        public void onMediaItemTransition(MediaItem mediaItem, int reason) {
+            if (mediaItem == null) return;
+            try {
+                long id = Long.parseLong(mediaItem.mediaId);
+                Track track = findTrack(id);
+                if (track != null && (currentTrack == null || currentTrack.id != track.id)) {
+                    runOnUiThread(() -> {
+                        currentTrack = track;
+                        recordTrackStarted(track);
+                        if (!playQueue.isEmpty() && playQueue.get(0).id == track.id) {
+                            playQueue.remove(0);
+                        }
+                        updateMiniPlayer();
+                        highlightPlayingTrack();
+                        refreshNowPlayingIfOpen();
+                    });
+                }
+            } catch (NumberFormatException ignored) {}
+        }
     };
     private Track currentTrack;
     private ImageButton miniPlay;
@@ -2818,30 +2839,36 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void previousTrackInPlayer() {
+        if (player != null && player.getMediaItemCount() > 1 && player.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) {
+            player.seekToPreviousMediaItem();
+            return;
+        }
         if (tracks.isEmpty()) return;
         int index = currentTrack == null ? 0 : tracks.indexOf(currentTrack);
         if (index < 0) index = 0;
         play(tracks.get(index <= 0 ? tracks.size() - 1 : index - 1));
-        refreshNowPlaying();
+        updateMiniPlayer();
     }
     private void nextTrackInPlayer() {
+        if (sleepAtTrackEnd) {
+            sleepAtTrackEnd = false;
+            sleepTimerEndMs = 0L;
+        }
+        if (player != null && player.getMediaItemCount() > 1 && player.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) {
+            player.seekToNextMediaItem();
+            return;
+        }
         if (playQueue.isEmpty() && tracks.size() > 1) {
             buildSmartQueue();
         }
         if (!playQueue.isEmpty()) {
             Track next = playQueue.remove(0);
-            if (sleepAtTrackEnd) {
-                sleepAtTrackEnd = false;
-                sleepTimerEndMs = 0L;
-            }
             play(next);
-            refreshNowPlaying();
             return;
         }
         if (tracks.isEmpty()) return;
         int index = currentTrack == null ? -1 : tracks.indexOf(currentTrack);
         play(tracks.get(index >= tracks.size() - 1 ? 0 : index + 1));
-        refreshNowPlaying();
     }
 
     private void refreshNowPlaying() {
@@ -2927,6 +2954,20 @@ public class MainActivity extends ComponentActivity {
                 .putInt("stats_schema", 2)
                 .commit();
     }
+    private MediaItem mediaItemForTrack(Track track) {
+        if (track == null) return null;
+        return new MediaItem.Builder()
+                .setUri(ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, track.id))
+                .setMediaId(String.valueOf(track.id))
+                .setMediaMetadata(new androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(safeTitle(track))
+                        .setArtist(safeArtist(track))
+                        .setAlbumArtist(safeArtist(track))
+                        .setArtworkUri(track.albumArtUri())
+                        .build())
+                .build();
+    }
+
     private void play(Track track) {
         if (track == null) return;
         if (player == null) {
@@ -2949,19 +2990,7 @@ public class MainActivity extends ComponentActivity {
             persistResumePosition();
         }
         currentTrack = track;
-        if (newPlayEvent) {
-            playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
-            recentTracks.remove(track);
-            recentTracks.add(0, track);
-            while (recentTracks.size() > 20) recentTracks.remove(recentTracks.size() - 1);
-            AurenAnalytics.recordPlayStart(this, track.id, safeArtist(track));
-            int beforeUnlocked = AchievementManager.stats(this).unlocked;
-            AchievementManager.recordPlay(this, track.id);
-            updateAlbumAchievement();
-            int afterUnlocked = AchievementManager.stats(this).unlocked;
-            if (afterUnlocked > beforeUnlocked) showAchievementToast();
-        }
-        persistListeningState(track);
+        if (newPlayEvent) recordTrackStarted(track); else persistListeningState(track);
 
         Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, track.id);
         MediaItem item = new MediaItem.Builder()
@@ -2983,11 +3012,18 @@ public class MainActivity extends ComponentActivity {
             resumePosition = Math.max(0L, prefs.getLong("resume_position", 0L));
         }
         item = item.buildUpon().setMediaId(String.valueOf(track.id)).build();
-        if (resumePosition > 0L) {
-            player.setMediaItem(item, resumePosition);
-        } else {
-            player.setMediaItem(item);
+
+        List<MediaItem> nativeItems = new ArrayList<>();
+        nativeItems.add(item);
+        if (playQueue.isEmpty() && tracks.size() > 1) {
+            buildSmartQueue();
         }
+        for (Track queued : playQueue) {
+            MediaItem queuedItem = mediaItemForTrack(queued);
+            if (queuedItem != null) nativeItems.add(queuedItem);
+        }
+
+        player.setMediaItems(nativeItems, 0, resumePosition);
         player.prepare();
         requestNotificationPermissionIfNeeded();
         player.play();
@@ -3034,6 +3070,29 @@ public class MainActivity extends ComponentActivity {
             }
         }
     }
+    private void recordTrackStarted(Track track) {
+        if (track == null) return;
+        playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
+        recentTracks.remove(track);
+        recentTracks.add(0, track);
+        while (recentTracks.size() > 20) recentTracks.remove(recentTracks.size() - 1);
+        AurenAnalytics.recordPlayStart(this, track.id, safeArtist(track));
+        int beforeUnlocked = AchievementManager.stats(this).unlocked;
+        AchievementManager.recordPlay(this, track.id);
+        updateAlbumAchievement();
+        int afterUnlocked = AchievementManager.stats(this).unlocked;
+        if (afterUnlocked > beforeUnlocked) showAchievementToast();
+        persistListeningState(track);
+    }
+
+    private void refreshNowPlayingIfOpen() {
+        if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
+            nowPlayingDialog.setContentView(buildNowPlayingView());
+            Window window = nowPlayingDialog.getWindow();
+            if (window != null) window.setLayout(-1, -1);
+        }
+    }
+
     private void updateMiniPlayer() {
         if (currentTrack == null || miniTitle == null || miniArtist == null || miniArt == null || miniPlay == null) return;
         miniTitle.setText(safeTitle(currentTrack));
