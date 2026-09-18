@@ -40,3 +40,6 @@
 - Builds de release exigem keystore de produção; não existe mais fallback silencioso para APK debug em uma release.
 - A tag precisa corresponder ao `versionName`.
 - Removido o commit automático de `build-status.json` do workflow; o resultado passa a ficar no GitHub Actions Step Summary.
+
+## Release delivery correction
+- A release build is published directly to GitHub Releases; the Actions artifact is not the public download.
