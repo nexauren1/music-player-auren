@@ -2370,7 +2370,9 @@ public class MainActivity extends ComponentActivity {
 
     private LinearLayout buildMiniPlayer() {
         LinearLayout mini = column();
-        mini.setBackground(roundDrawable(ThemeManager.surfaceAlt(this), 20));
+        GradientDrawable miniBg = roundDrawable(ThemeManager.surfaceAlt(this), 20);
+        miniBg.setStroke(dp(1), ThemeManager.outline(this));
+        mini.setBackground(miniBg);
         mini.setElevation(dp(10));
         mini.setPadding(0, 0, 0, dp(1));
 
@@ -2655,6 +2657,7 @@ public class MainActivity extends ComponentActivity {
     private void showMiniPlayerMenu(View anchor) {
         PopupMenu popup = new PopupMenu(this, anchor);
         popup.getMenu().add("Fila inteligente");
+        popup.getMenu().add("Modo conduzir");
         popup.getMenu().add("Estatísticas");
         popup.getMenu().add("Fila de reprodução");
         popup.getMenu().add("Temporizador de sono");
