@@ -5,7 +5,10 @@ import androidx.media3.common.C;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
+import androidx.media3.common.util.UnstableApi;
 
+
+@UnstableApi
 public final class PlaybackService extends MediaSessionService {
     private ExoPlayer player;
     private MediaSession mediaSession;
@@ -24,6 +27,7 @@ public final class PlaybackService extends MediaSessionService {
         );
         player.setHandleAudioBecomingNoisy(true);
 
+        AudioEffectsManager.attach(this, player.getAudioSessionId());
         mediaSession = new MediaSession.Builder(this, player).build();
     }
 
@@ -38,7 +42,8 @@ public final class PlaybackService extends MediaSessionService {
             mediaSession.release();
             mediaSession = null;
         }
-        if (player != null) {
+        AudioEffectsManager.release();
+        if (player != null)
             player.release();
             player = null;
         }
