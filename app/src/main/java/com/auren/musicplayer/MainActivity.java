@@ -1,17 +1,16 @@
 package com.auren.musicplayer;
 
-import android.content.ComponentName;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ContentUris;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.media.audiofx.Equalizer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -40,7 +39,10 @@ import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
-import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.session.MediaController;
+import androidx.media3.session.SessionToken;
+
+import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,12 +56,38 @@ import java.util.HashSet;
 
 public class MainActivity extends ComponentActivity {
     private static final int MUSIC_PERMISSION = 41;
+    private static final int NOTIFICATION_PERMISSION = 42;
     private final List<Track> tracks = new ArrayList<>();
     private final List<Track> recentTracks = new ArrayList<>();
     private final Map<Long, Integer> playCounts = new HashMap<>();
     private final Handler handler = new Handler();
 
-    private ExoPlayer player;
+    private Player player;
+    private MediaController mediaController;
+    private ListenableFuture<MediaController> controllerFuture;
+    private boolean notificationPermissionRequested;
+
+    private final Player.Listener playbackListener = new Player.Listener() {
+        @Override
+        public void onPlaybackStateChanged(int state) {
+            if (state == Player.STATE_ENDED && player != null
+                    && player.getRepeatMode() == Player.REPEAT_MODE_OFF) {
+                runOnUiThread(() -> nextTrackInPlayer());
+            } else {
+                runOnUiThread(() -> {
+                    updateMiniPlayer();
+                    highlightPlayingTrack();
+                });
+            }
+        }
+
+        @Override
+        public void onIsPlayingChanged(boolean isPlaying) {
+            runOnUiThread(() -> {
+                updateMiniPlayer();
+            });
+        }
+    };
     private Track currentTrack;
     private ImageButton miniPlay;
     private ImageView miniArt;
@@ -80,7 +108,6 @@ public class MainActivity extends ComponentActivity {
     private long abStartMs = -1L;
     private long abEndMs = -1L;
     private boolean abRepeatEnabled;
-    private Equalizer equalizer;
     private String librarySortMode = "title";
 
     private final Runnable progressUpdater = new Runnable() {
@@ -93,11 +120,30 @@ public class MainActivity extends ComponentActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        player = new ExoPlayer.Builder(this).build();
-        player.setHandleAudioBecomingNoisy(true);
         buildShell();
+        connectPlaybackController();
         requestMusicPermission();
         handler.post(progressUpdater);
+    }
+
+    private void connectPlaybackController() {
+        SessionToken token = new SessionToken(this, new ComponentName(this, PlaybackService.class));
+        controllerFuture = new MediaController.Builder(this, token).buildAsync();
+        controllerFuture.addListener(() -> {
+            try {
+                MediaController controller = controllerFuture.get();
+                runOnUiThread(() -> {
+                    mediaController = controller;
+                    player = controller;
+                    player.addListener(playbackListener);
+                    applyPlaybackEffects();
+                    updateMiniPlayer();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() ->
+                        Toast.makeText(this, "Não foi possível iniciar o mecanismo de áudio.", Toast.LENGTH_LONG).show());
+            }
+        }, Runnable::run);
     }
 
     private void buildShell() {
@@ -115,32 +161,29 @@ public class MainActivity extends ComponentActivity {
         setContentView(root);
         showHome();
     }
-
     private View buildTopBar() {
         LinearLayout bar = row();
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(10), dp(6), dp(10), dp(6));
-        bar.setBackgroundColor(getColor(R.color.auren_primary));
-        bar.setElevation(dp(4));
+        bar.setPadding(dp(12), dp(8), dp(12), dp(8));
+        bar.setBackgroundColor(Color.WHITE);
+        bar.setElevation(dp(2));
 
-        ImageButton menu = iconButton(android.R.drawable.ic_menu_sort_by_size, "Open menu");
-        menu.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
-        DrawableCompat.setTint(menu.getDrawable(), Color.WHITE);
+        ImageButton menu = iconButton(android.R.drawable.ic_menu_sort_by_size, "Abrir menu");
+        DrawableCompat.setTint(menu.getDrawable(), getColor(R.color.auren_primary));
         menu.setOnClickListener(v -> showAppMenu(menu));
-        bar.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        bar.addView(menu, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
-        TextView title = text("Auren Music", 19, android.R.color.white);
+        TextView title = text("Auren Music", 20, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        bar.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
+        bar.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1));
 
-        ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Search music");
-        search.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
-        DrawableCompat.setTint(search.getDrawable(), Color.WHITE);
+        ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Pesquisar música");
+        DrawableCompat.setTint(search.getDrawable(), getColor(R.color.text_primary));
         search.setOnClickListener(v -> showSearchDialog());
-        bar.addView(search, new LinearLayout.LayoutParams(dp(48), dp(48)));
-
+        bar.addView(search, new LinearLayout.LayoutParams(dp(44), dp(44)));
         return bar;
     }
+
 
     private View buildHomeHero() {
         LinearLayout card = rounded(getColor(R.color.auren_primary), 26);
@@ -201,7 +244,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout brandBox = column();
         TextView small = text("AUREN MUSIC", 11, R.color.auren_primary);
         small.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text("Good music,\nanytime.", 30, R.color.text_primary);
+        TextView title = text("Boa música,\nsempre.", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         brandBox.addView(small);
         brandBox.addView(title, margins(0, 4, 0, 0));
@@ -212,13 +255,13 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout quick = row();
         quick.setGravity(Gravity.CENTER_VERTICAL);
-        quick.addView(actionCard("▶", "Shuffle", v -> shufflePlay()), new LinearLayout.LayoutParams(0, dp(82), 1));
-        quick.addView(actionCard("♥", "Favorites", v -> showLibrary(true)), margins(10, 0, 0, 0));
+        quick.addView(actionCard("▶", "Aleatório", v -> shufflePlay()), new LinearLayout.LayoutParams(0, dp(82), 1));
+        quick.addView(actionCard("♥", "Favoritos", v -> showLibrary(true)), margins(10, 0, 0, 0));
         content.addView(quick, margins(0, 18, 0, 0));
 
-        addSectionHeader(content, "Recently played", "See all", v -> showLibrary());
+        addSectionHeader(content, "Reproduzidas recentemente", "Ver tudo", v -> showLibrary());
         if (recentTracks.isEmpty()) {
-            content.addView(emptyCard("Your recently played songs will appear here."));
+            content.addView(emptyCard("As músicas reproduzidas recentemente aparecerão aqui."));
         } else {
             LinearLayout recentRow = row();
             HorizontalScrollView horizontal = new HorizontalScrollView(this);
@@ -231,10 +274,10 @@ public class MainActivity extends ComponentActivity {
             content.addView(horizontal);
         }
 
-        addSectionHeader(content, "Most played", "Your favorites", v -> showMostPlayed());
+        addSectionHeader(content, "Mais tocadas", "Seus favoritos", v -> showMostPlayed());
         List<Track> mostPlayed = sortedByPlayCount();
         if (mostPlayed.isEmpty() || playCounts.getOrDefault(mostPlayed.get(0).id, 0) == 0) {
-            content.addView(emptyCard("Play some songs and your most played list will grow."));
+            content.addView(emptyCard("Reproduza algumas músicas e sua lista de mais tocadas aparecerá aqui."));
         } else {
             for (int i = 0; i < Math.min(4, mostPlayed.size()); i++) {
                 content.addView(trackRow(mostPlayed.get(i), i + 1));
@@ -246,16 +289,25 @@ public class MainActivity extends ComponentActivity {
         if (tracks.isEmpty()) {
             content.addView(emptyCard("Nenhuma música encontrada no dispositivo."));
         } else {
-            for (Track track : tracks) {
-                content.addView(trackRow(track, 0));
+            int visible = Math.min(12, tracks.size());
+            for (int i = 0; i < visible; i++) {
+                content.addView(trackRow(tracks.get(i), 0));
+            }
+            if (tracks.size() > visible) {
+                TextView more = text("Ver todas as " + tracks.size() + " músicas", 13, R.color.auren_primary);
+                more.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                more.setGravity(Gravity.CENTER);
+                more.setPadding(dp(8), dp(14), dp(8), dp(14));
+                more.setOnClickListener(v -> showLibrary());
+                content.addView(more);
             }
         }
         // AUREN_ALL_SONGS_HOME_END
 
-        addSectionHeader(content, "Suggestions for you", "Refresh", v -> showHome());
+        addSectionHeader(content, "Sugestões para você", "Atualizar", v -> showHome());
         List<Track> suggestions = suggestionTracks();
         if (suggestions.isEmpty()) {
-            content.addView(emptyCard("Suggestions will appear after your library is loaded."));
+            content.addView(emptyCard("As sugestões aparecerão quando sua biblioteca for carregada."));
         } else {
             for (int i = 0; i < Math.min(5, suggestions.size()); i++) {
                 content.addView(trackRow(suggestions.get(i), 0));
@@ -275,7 +327,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(22));
 
-        TextView eyebrow = text("YOUR LIBRARY", 11, R.color.auren_primary);
+        TextView eyebrow = text("SUA BIBLIOTECA", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Biblioteca", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -300,14 +352,14 @@ public class MainActivity extends ComponentActivity {
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
         LinearLayout header = row();
         LinearLayout titles = column();
-        TextView eyebrow = text("YOUR FAVORITES", 11, R.color.auren_primary);
+        TextView eyebrow = text("SEUS FAVORITOS", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Favoritos", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         titles.addView(eyebrow);
         titles.addView(title, margins(0, 3, 0, 0));
         header.addView(titles, new LinearLayout.LayoutParams(0, -2, 1));
-        ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Search music");
+        ImageButton search = iconButton(android.R.drawable.ic_menu_search, "Pesquisar música");
         search.setOnClickListener(v -> showSearchDialog());
         header.addView(search, new LinearLayout.LayoutParams(dp(48), dp(48)));
         content.addView(header);
@@ -356,7 +408,7 @@ public class MainActivity extends ComponentActivity {
         pageContainer.removeAllViews();
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
-        TextView eyebrow = text("YOUR HISTORY", 11, R.color.auren_primary);
+        TextView eyebrow = text("SEU HISTÓRICO", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Recentes", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -379,7 +431,7 @@ public class MainActivity extends ComponentActivity {
         pageContainer.removeAllViews();
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
-        TextView eyebrow = text("FOR YOU", 11, R.color.auren_primary);
+        TextView eyebrow = text("PARA VOCÊ", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Sugestões", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -403,7 +455,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
 
-        TextView eyebrow = text("YOUR COLLECTION", 11, R.color.auren_primary);
+        TextView eyebrow = text("SUA COLEÇÃO", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Playlists", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -425,9 +477,9 @@ public class MainActivity extends ComponentActivity {
         create.setOnClickListener(v -> showCreatePlaylistDialog());
         content.addView(create, margins(0, 18, 0, 12));
 
-        content.addView(playlistCard("Liked songs", "Songs you marked as favorite", countFavorites(), true));
-        content.addView(playlistCard("Recently played", "Your latest listening history", recentTracks.size(), false), margins(0, 10, 0, 0));
-        content.addView(playlistCard("Most played", "The tracks you play the most", Math.min(10, tracks.size()), false), margins(0, 10, 0, 0));
+        content.addView(playlistCard("Músicas favoritas", "Músicas que você marcou como favorita", countFavorites(), true));
+        content.addView(playlistCard("Reproduzidas recentemente", "Seu histórico de reprodução", recentTracks.size(), false), margins(0, 10, 0, 0));
+        content.addView(playlistCard("Mais tocadas", "As músicas que você mais ouve", Math.min(10, tracks.size()), false), margins(0, 10, 0, 0));
 
         Set<String> names = getSharedPreferences("auren_player", MODE_PRIVATE)
                 .getStringSet("playlist_names", new HashSet<>());
@@ -451,30 +503,42 @@ public class MainActivity extends ComponentActivity {
         nav.setGravity(Gravity.CENTER);
         nav.setPadding(dp(8), dp(5), dp(8), dp(8));
         nav.setBackgroundColor(Color.WHITE);
-        homeTab = navItem("⌂", "Home", v -> showHome());
-        libraryTab = navItem("♫", "Library", v -> showLibrary());
-        playlistTab = navItem("▤", "Playlists", v -> showPlaylists());
+        homeTab = navItem("HOME", "Início", v -> showHome());
+        libraryTab = navItem("LIBRARY", "Biblioteca", v -> showLibrary());
+        playlistTab = navItem("PLAYLIST", "Playlists", v -> showPlaylists());
         nav.addView(homeTab, new LinearLayout.LayoutParams(0, dp(58), 1));
         nav.addView(libraryTab, new LinearLayout.LayoutParams(0, dp(58), 1));
         nav.addView(playlistTab, new LinearLayout.LayoutParams(0, dp(58), 1));
         return nav;
     }
-
     private TextView navItem(String icon, String label, View.OnClickListener listener) {
-        TextView v = text(icon + "\n" + label, 12, R.color.text_secondary);
+        int iconRes = icon.equals("HOME") ? R.drawable.ic_home
+                : icon.equals("LIBRARY") ? R.drawable.ic_library_music
+                : R.drawable.ic_playlist_play;
+        TextView v = text(label, 11, R.color.text_secondary);
         v.setGravity(Gravity.CENTER);
         v.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        v.setCompoundDrawablesWithIntrinsicBounds(0, iconRes, 0, 0);
+        v.setCompoundDrawablePadding(dp(3));
+        v.setPadding(0, dp(4), 0, dp(4));
+        v.setContentDescription(label);
         v.setOnClickListener(listener);
         return v;
     }
-
     private void setActiveTab(TextView active) {
         if (homeTab == null) return;
-        homeTab.setTextColor(getColor(R.color.text_secondary));
-        libraryTab.setTextColor(getColor(R.color.text_secondary));
-        playlistTab.setTextColor(getColor(R.color.text_secondary));
-        active.setTextColor(getColor(R.color.auren_primary));
+        int inactive = getColor(R.color.text_secondary);
+        int selected = getColor(R.color.auren_primary);
+        homeTab.setTextColor(inactive);
+        libraryTab.setTextColor(inactive);
+        playlistTab.setTextColor(inactive);
+        homeTab.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(inactive));
+        libraryTab.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(inactive));
+        playlistTab.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(inactive));
+        active.setTextColor(selected);
+        active.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(selected));
     }
+
     private void showAppMenu(View anchor) {
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -560,21 +624,21 @@ public class MainActivity extends ComponentActivity {
     private void showAboutDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Auren Music")
-                .setMessage("A clean, modern music player built around your local library.\n\nVersion " + BuildConfig.VERSION_NAME + "\n\nMusic that moves with you.")
-                .setPositiveButton("Close", null)
+                .setMessage("Um player de música moderno, feito para a sua biblioteca local.\n\nVersion " + BuildConfig.VERSION_NAME + "\n\nMusic that moves with you.")
+                .setPositiveButton("Fechar", null)
                 .show();
     }
 
     private void showSearchDialog() {
         EditText input = new EditText(this);
-        input.setHint("Song or artist");
+        input.setHint("Música ou artista");
         input.setSingleLine(true);
         int pad = dp(18);
         input.setPadding(pad, pad, pad, pad);
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Search your music")
+                .setTitle("Pesquisar sua música")
                 .setView(input)
-                .setNegativeButton("Close", null)
+                .setNegativeButton("Fechar", null)
                 .create();
         input.setOnEditorActionListener((v, actionId, event) -> {
             performSearch(input.getText().toString(), dialog);
@@ -595,21 +659,21 @@ public class MainActivity extends ComponentActivity {
         }
         dialog.dismiss();
         if (matches.isEmpty()) {
-            Toast.makeText(this, "No songs found.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Nenhuma música encontrada.", Toast.LENGTH_SHORT).show();
             return;
         }
         LinearLayout list = column();
         list.setPadding(dp(18), dp(10), dp(18), dp(18));
-        TextView resultTitle = text(matches.size() + " result" + (matches.size() == 1 ? "" : "s"), 13, R.color.auren_primary);
-        resultTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView resultTitle = text(matches.size() + " resultado" + (matches.size() == 1 ? "" : "s"), 13, R.color.auren_primary);
+        resultadoTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         list.addView(resultTitle, margins(0, 4, 0, 8));
         for (Track track : matches) list.addView(trackRow(track, 0));
         ScrollView scroll = new ScrollView(this);
         scroll.addView(list);
         new AlertDialog.Builder(this)
-                .setTitle("Search results")
+                .setTitle("Resultados da pesquisa")
                 .setView(scroll)
-                .setPositiveButton("Done", null)
+                .setPositiveButton("Concluído", null)
                 .show();
     }
     private LinearLayout buildMiniPlayer() {
@@ -633,12 +697,12 @@ public class MainActivity extends ComponentActivity {
         info.setGravity(Gravity.CENTER_VERTICAL);
         info.setPadding(dp(12), 0, dp(8), 0);
 
-        miniTitle = text("Nothing playing", 14, R.color.text_primary);
+        miniTitle = text("Nada a tocar", 14, R.color.text_primary);
         miniTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         miniTitle.setSingleLine(true);
         miniTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
 
-        miniArtist = text("Choose a song to start", 12, R.color.text_secondary);
+        miniArtist = text("Escolha uma música para começar", 12, R.color.text_secondary);
         miniArtist.setSingleLine(true);
         miniArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
 
@@ -646,43 +710,19 @@ public class MainActivity extends ComponentActivity {
         info.addView(miniArtist, margins(0, 2, 0, 0));
         row.addView(info, new LinearLayout.LayoutParams(0, dp(52), 1));
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
         functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
         DrawableCompat.setTint(functions.getDrawable(), getColor(R.color.text_primary));
         functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
         row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));
 
-        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Next song");
+        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Próxima música");
         next.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
         DrawableCompat.setTint(next.getDrawable(), getColor(R.color.text_primary));
         next.setOnClickListener(v -> nextTrackInPlayer());
         row.addView(next, new LinearLayout.LayoutParams(dp(42), dp(52)));
 
-        miniPlay = iconButton(android.R.drawable.ic_media_play, "Play or pause");
+        miniPlay = iconButton(android.R.drawable.ic_media_play, "Reproduzir ou pausar");
         miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
         DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
         miniPlay.setPadding(dp(12), dp(12), dp(12), dp(12));
@@ -703,7 +743,7 @@ public class MainActivity extends ComponentActivity {
 
     private void openNowPlaying() {
         if (currentTrack == null) {
-            Toast.makeText(this, "Choose a song first", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Escolha uma música primeiro", Toast.LENGTH_SHORT).show();
             return;
         }
         if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) return;
@@ -720,22 +760,24 @@ public class MainActivity extends ComponentActivity {
         nowPlayingDialog.show();
         if (window != null) window.setLayout(-1, -1);
     }
-
     private View buildNowPlayingView() {
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(getColor(R.color.surface));
+
         LinearLayout root = column();
         root.setPadding(dp(20), dp(16), dp(20), dp(22));
 
         LinearLayout top = row();
-        ImageButton close = iconButton(android.R.drawable.ic_menu_close_clear_cancel, "Close player");
+        ImageButton close = iconButton(android.R.drawable.ic_menu_close_clear_cancel, "Fechar player");
         close.setOnClickListener(v -> closeNowPlaying());
         top.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView label = text("NOW PLAYING", 12, R.color.auren_primary);
+
+        TextView label = text("A TOCAR", 12, R.color.auren_primary);
         label.setGravity(Gravity.CENTER);
         label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         top.addView(label, new LinearLayout.LayoutParams(0, dp(48), 1));
-        ImageButton more = iconButton(android.R.drawable.ic_menu_more, "Player options");
+
+        ImageButton more = iconButton(android.R.drawable.ic_menu_more, "Opções do player");
         more.setOnClickListener(v -> {
             PopupMenu popup = new PopupMenu(this, more);
             popup.getMenu().add("Reproduzir novamente");
@@ -748,38 +790,11 @@ public class MainActivity extends ComponentActivity {
                 if (action.equals("Reproduzir novamente")) {
                     player.seekTo(0);
                     player.play();
-                    refreshNowPlaying();
                 } else if (action.contains("favoritos")) {
                     setFavorite(currentTrack, !isFavorite(currentTrack));
                     updateMiniPlayer();
-                    refreshNowPlaying();
                 } else if (action.equals("Aleatório")) {
                     shufflePlay();
-                    refreshNowPlaying();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
-                } else if (action.startsWith("Efeitos:")) {
-                    showEffectsDialog();
                 } else if (action.startsWith("Efeitos:")) {
                     showEffectsDialog();
                 } else {
@@ -796,7 +811,7 @@ public class MainActivity extends ComponentActivity {
         hero.setImageURI(currentTrack.albumArtUri());
         if (hero.getDrawable() == null) hero.setImageResource(android.R.drawable.ic_media_play);
         hero.setPadding(0, 0, 0, 0);
-        hero.setElevation(dp(10));
+        hero.setElevation(dp(8));
         LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, dp(300));
         heroParams.setMargins(0, dp(18), 0, dp(22));
         root.addView(hero, heroParams);
@@ -810,10 +825,15 @@ public class MainActivity extends ComponentActivity {
         names.addView(artist, margins(0, 3, 0, 0));
         titleRow.addView(names, new LinearLayout.LayoutParams(0, dp(62), 1));
 
-        ImageButton favorite = iconButton(isFavorite(currentTrack) ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off, "Favorite");
+        ImageButton favorite = iconButton(
+                isFavorite(currentTrack) ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off,
+                "Favoritar");
         favorite.setOnClickListener(v -> {
             setFavorite(currentTrack, !isFavorite(currentTrack));
-            favorite.setImageResource(isFavorite(currentTrack) ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off);
+            favorite.setImageResource(
+                    isFavorite(currentTrack)
+                            ? android.R.drawable.btn_star_big_on
+                            : android.R.drawable.btn_star_big_off);
             showLibraryIfNeeded();
         });
         titleRow.addView(favorite, new LinearLayout.LayoutParams(dp(52), dp(62)));
@@ -825,7 +845,9 @@ public class MainActivity extends ComponentActivity {
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
                 userDragging = fromUser;
-                if (fromUser && player.getDuration() > 0) player.seekTo(player.getDuration() * progress / 1000L);
+                if (fromUser && player != null && player.getDuration() > 0) {
+                    player.seekTo(player.getDuration() * progress / 1000L);
+                }
             }
             @Override public void onStartTrackingTouch(SeekBar bar) { userDragging = true; }
             @Override public void onStopTrackingTouch(SeekBar bar) { userDragging = false; }
@@ -842,32 +864,42 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout controls = row();
         controls.setGravity(Gravity.CENTER);
-        ImageButton previous = iconButton(android.R.drawable.ic_media_previous, "Previous");
+        ImageButton previous = iconButton(android.R.drawable.ic_media_previous, "Anterior");
         previous.setOnClickListener(v -> previousTrackInPlayer());
         controls.addView(previous, new LinearLayout.LayoutParams(dp(64), dp(64)));
-        ImageButton playPause = iconButton(player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, "Play or pause");
-        playPause.setBackgroundTintList(android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
+
+        ImageButton playPause = iconButton(
+                player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                "Reproduzir ou pausar");
+        playPause.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(getColor(R.color.auren_primary)));
         DrawableCompat.setTint(playPause.getDrawable(), Color.WHITE);
         playPause.setPadding(dp(18), dp(18), dp(18), dp(18));
         playPause.setOnClickListener(v -> {
             togglePlayback();
-            playPause.setImageResource(player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+            playPause.setImageResource(
+                    player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
             DrawableCompat.setTint(playPause.getDrawable(), Color.WHITE);
         });
         controls.addView(playPause, new LinearLayout.LayoutParams(dp(76), dp(76)));
-        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Next");
+
+        ImageButton next = iconButton(android.R.drawable.ic_media_next, "Próxima música");
         next.setOnClickListener(v -> nextTrackInPlayer());
         controls.addView(next, new LinearLayout.LayoutParams(dp(64), dp(64)));
         root.addView(controls, margins(0, 8, 0, 0));
 
         LinearLayout extras = row();
         extras.setGravity(Gravity.CENTER);
-        extras.addView(playerAction("↶", "Replay", v -> player.seekTo(0)), new LinearLayout.LayoutParams(0, dp(58), 1));
-        extras.addView(playerAction("⇄", "Shuffle", v -> shufflePlay()), new LinearLayout.LayoutParams(0, dp(58), 1));
-        extras.addView(playerAction("☰", "Queue", v -> showQueueDialog()), new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("↶", "Repetir", v -> {
+            if (player != null) player.seekTo(0);
+        }), new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("⇄", "Aleatório", v -> shufflePlay()),
+                new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("☰", "Fila", v -> showQueueDialog()),
+                new LinearLayout.LayoutParams(0, dp(58), 1));
         root.addView(extras, margins(0, 8, 0, 0));
 
-        TextView hint = text("Auren • Music that moves with you", 11, R.color.text_secondary);
+        TextView hint = text("Auren • Música que acompanha você", 11, R.color.text_secondary);
         hint.setGravity(Gravity.CENTER);
         root.addView(hint, margins(0, 10, 0, 0));
 
@@ -880,7 +912,6 @@ public class MainActivity extends ComponentActivity {
         popup.getMenu().add("Temporizador de sono");
         popup.getMenu().add("Repetição");
         popup.getMenu().add("Repetir trecho A-B");
-        popup.getMenu().add("Equalizador");
         popup.getMenu().add("Ordenar biblioteca");
         popup.getMenu().add("Atualizar biblioteca");
         popup.getMenu().add("Efeitos");
@@ -898,8 +929,6 @@ public class MainActivity extends ComponentActivity {
                 showRepeatDialog();
             } else if (action.equals("Repetir trecho A-B")) {
                 showAbRepeatDialog();
-            } else if (action.equals("Equalizador")) {
-                showEqualizerDialog();
             } else if (action.equals("Ordenar biblioteca")) {
                 showSortDialog();
             } else if (action.equals("Atualizar biblioteca")) {
@@ -1039,33 +1068,77 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
+    private void restoreListeningState() {
+        SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
+        playCounts.clear();
+        for (Track track : tracks) {
+            int count = prefs.getInt("play_count_" + track.id, 0);
+            if (count > 0) playCounts.put(track.id, count);
+        }
 
+        recentTracks.clear();
+        String recent = prefs.getString("recent_tracks", "");
+        if (recent == null || recent.trim().isEmpty()) return;
+        for (String value : recent.split(",")) {
+            try {
+                long id = Long.parseLong(value.trim());
+                for (Track track : tracks) {
+                    if (track.id == id) {
+                        recentTracks.add(track);
+                        break;
+                    }
+                }
+            } catch (NumberFormatException ignored) {
+            }
+            if (recentTracks.size() >= 20) break;
+        }
+    }
 
-
-
-
-
-
-
-
-
-
+    private void persistListeningState(Track track) {
+        if (track == null) return;
+        StringBuilder history = new StringBuilder();
+        for (Track recent : recentTracks) {
+            if (history.length() > 0) history.append(',');
+            history.append(recent.id);
+        }
+        getSharedPreferences("auren_player", MODE_PRIVATE).edit()
+                .putInt("play_count_" + track.id, playCounts.getOrDefault(track.id, 0))
+                .putString("recent_tracks", history.toString())
+                .apply();
+    }
     private void play(Track track) {
-        if (track == null || player == null) return;
+        if (track == null) return;
+        if (player == null) {
+            Toast.makeText(this, "O áudio ainda está a iniciar. Tente novamente.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         currentTrack = track;
-        int count = playCounts.getOrDefault(track.id, 0);
-        playCounts.put(track.id, count + 1);
+        playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
         recentTracks.remove(track);
         recentTracks.add(0, track);
         while (recentTracks.size() > 20) recentTracks.remove(recentTracks.size() - 1);
+        persistListeningState(track);
 
         Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, track.id);
-        player.setMediaItem(MediaItem.fromUri(uri));
+        MediaItem item = new MediaItem.Builder()
+                .setUri(uri)
+                .setMediaMetadata(new androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(safeTitle(track))
+                        .setArtist(safeArtist(track))
+                        .setAlbumArtist(safeArtist(track))
+                        .setArtworkUri(track.albumArtUri())
+                        .build())
+                .build();
+
+        player.setMediaItem(item);
         player.prepare();
+        requestNotificationPermissionIfNeeded();
         player.play();
         updateMiniPlayer();
         highlightPlayingTrack();
     }
+
 
     private void togglePlayback() {
         if (player == null) return;
@@ -1127,6 +1200,19 @@ public class MainActivity extends ComponentActivity {
         openNowPlaying();
     }
 
+    private void requestNotificationPermissionIfNeeded() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && !notificationPermissionRequested
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            notificationPermissionRequested = true;
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    NOTIFICATION_PERMISSION
+            );
+        }
+    }
+
     private void requestMusicPermission() {
         String permission = android.os.Build.VERSION.SDK_INT >= 33
                 ? Manifest.permission.READ_MEDIA_AUDIO
@@ -1134,11 +1220,19 @@ public class MainActivity extends ComponentActivity {
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) loadMusic();
         else ActivityCompat.requestPermissions(this, new String[]{permission}, MUSIC_PERMISSION);
     }
-
-    @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] results) {
-        super.onRequestPermissionsResult(requestCode, permissions, results);
-        if (requestCode == MUSIC_PERMISSION && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) loadMusic();
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] resultados) {
+        super.onRequestPermissionsResult(requestCode, permissions, resultados);
+        if (requestCode == MUSIC_PERMISSION && resultados.length > 0
+                && resultados[0] == PackageManager.PERMISSION_GRANTED) {
+            loadMusic();
+        } else if (requestCode == MUSIC_PERMISSION) {
+            Toast.makeText(this,
+                    "É necessária a permissão de música para mostrar a sua biblioteca.",
+                    Toast.LENGTH_LONG).show();
+        }
     }
+
 
     private void loadMusic() {
         tracks.clear();
@@ -1168,6 +1262,7 @@ public class MainActivity extends ComponentActivity {
             }
         }
         applyLibrarySort();
+        restoreListeningState();
         if (pageContainer != null) showHome();
     }
 
@@ -1242,22 +1337,21 @@ public class MainActivity extends ComponentActivity {
             player.seekTo(abStartMs);
         }
     }
-
     private void showRepeatDialog() {
-        int mode = player.getRepeatMode();
-        String[] labels = {"Desligado", "Repetir faixa", "Repetir fila"};
-        int checked = mode == Player.REPEAT_MODE_ONE ? 1 : mode == Player.REPEAT_MODE_ALL ? 2 : 0;
+        if (player == null) return;
+        String[] labels = {"Desligado", "Repetir faixa"};
+        int checked = player.getRepeatMode() == Player.REPEAT_MODE_ONE ? 1 : 0;
         new AlertDialog.Builder(this)
                 .setTitle("Repetição")
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
-                    int target = which == 1 ? Player.REPEAT_MODE_ONE : which == 2 ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF;
-                    player.setRepeatMode(target);
+                    player.setRepeatMode(which == 1 ? Player.REPEAT_MODE_ONE : Player.REPEAT_MODE_OFF);
                     dialog.dismiss();
                     Toast.makeText(this, "Repetição: " + labels[which], Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
     }
+
 
     private void showAbRepeatDialog() {
         String start = abStartMs >= 0L ? formatTime(abStartMs) : "não definido";
@@ -1323,94 +1417,22 @@ public class MainActivity extends ComponentActivity {
                 .getString("library_sort", librarySortMode);
         Collections.sort(tracks, new Comparator<Track>() {
             @Override public int compare(Track a, Track b) {
-                int result;
+                int resultado;
                 if (librarySortMode.equals("artist")) {
-                    result = safeArtist(a).compareToIgnoreCase(safeArtist(b));
+                    resultado = safeArtist(a).compareToIgnoreCase(safeArtist(b));
                 } else if (librarySortMode.equals("duration_asc")) {
-                    result = Long.compare(a.durationMs, b.durationMs);
+                    resultado = Long.compare(a.durationMs, b.durationMs);
                 } else if (librarySortMode.equals("duration_desc")) {
-                    result = Long.compare(b.durationMs, a.durationMs);
+                    resultado = Long.compare(b.durationMs, a.durationMs);
                 } else {
-                    result = safeTitle(a).compareToIgnoreCase(safeTitle(b));
+                    resultado = safeTitle(a).compareToIgnoreCase(safeTitle(b));
                 }
-                if (result != 0) return result;
+                if (resultado != 0) return resultado;
                 return safeTitle(a).compareToIgnoreCase(safeTitle(b));
             }
         });
     }
 
-    private void showEqualizerDialog() {
-        if (player == null || player.getAudioSessionId() <= 0) {
-            Toast.makeText(this, "Inicie uma música antes de abrir o equalizador.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        try {
-            if (equalizer != null) {
-                equalizer.release();
-                equalizer = null;
-            }
-            equalizer = new Equalizer(0, player.getAudioSessionId());
-            equalizer.setEnabled(true);
-            short[] range = equalizer.getBandLevelRange();
-            short bands = equalizer.getNumberOfBands();
-            int shown = Math.min(5, bands);
-
-            LinearLayout root = column();
-            root.setPadding(dp(18), dp(4), dp(18), dp(4));
-            TextView note = text("Ajuste as bandas do áudio. A disponibilidade depende do aparelho.", 12, R.color.text_secondary);
-            root.addView(note, margins(0, 0, 0, 10));
-            for (short i = 0; i < shown; i++) {
-                LinearLayout line = row();
-                int hz = equalizer.getCenterFreq(i) / 1000;
-                TextView label = text((hz >= 1000 ? (hz / 1000) + " kHz" : hz + " Hz"), 11, R.color.text_secondary);
-                line.addView(label, new LinearLayout.LayoutParams(dp(58), dp(42)));
-                SeekBar band = new SeekBar(this);
-                int min = range[0];
-                int max = range[1];
-                band.setMax(max - min);
-                band.setProgress(equalizer.getBandLevel(i) - min);
-                final short bandIndex = i;
-                band.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                    @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                        if (fromUser && equalizer != null) {
-                            equalizer.setBandLevel(bandIndex, (short) (range[0] + progress));
-                        }
-                    }
-                    @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-                    @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-                });
-                line.addView(band, new LinearLayout.LayoutParams(0, dp(42), 1));
-                root.addView(line);
-            }
-            TextView reset = text("Repor EQ", 12, R.color.auren_primary);
-            reset.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            reset.setPadding(0, dp(8), 0, dp(8));
-            reset.setOnClickListener(v -> {
-                if (equalizer != null) {
-                    short[] r = equalizer.getBandLevelRange();
-                    short n = equalizer.getNumberOfBands();
-                    short middle = (short) ((r[0] + r[1]) / 2);
-                    for (short i = 0; i < n; i++) equalizer.setBandLevel(i, middle);
-                }
-            });
-            root.addView(reset);
-
-            new AlertDialog.Builder(this)
-                    .setTitle("Equalizador Auren")
-                    .setView(root)
-                    .setPositiveButton("Fechar", null)
-                    .show();
-        } catch (Exception e) {
-            Toast.makeText(this, "O equalizador não está disponível neste aparelho.", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void releaseEqualizer() {
-        if (equalizer != null) {
-            try { equalizer.release(); } catch (Exception ignored) {}
-            equalizer = null;
-        }
-    }
 
     private View actionCard(String icon, String label, View.OnClickListener listener) {
         LinearLayout card = rounded(0xFFEEECFF, 20);
@@ -1455,22 +1477,9 @@ public class MainActivity extends ComponentActivity {
         return card;
     }
     private View trackRow(Track track, int number) {
-        LinearLayout row = rounded(0xFFFFFFFF, 16);
+        LinearLayout row = rounded(Color.WHITE, 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
-        row.setTag(track.id);
         row.setTag(track.id);
 
         ImageView art = artwork(48);
@@ -1497,19 +1506,19 @@ public class MainActivity extends ComponentActivity {
         row.addView(info, new LinearLayout.LayoutParams(0, dp(56), 1));
 
         if (number > 0) {
-            TextView plays = text(playCounts.getOrDefault(track.id, 0) + " plays", 10, R.color.text_secondary);
+            TextView plays = text(playCounts.getOrDefault(track.id, 0) + " reproduções", 10, R.color.text_secondary);
             plays.setGravity(Gravity.CENTER);
-            row.addView(plays, new LinearLayout.LayoutParams(dp(48), dp(48)));
+            row.addView(plays, new LinearLayout.LayoutParams(dp(72), dp(48)));
         }
 
         ImageButton overflow = iconButton(android.R.drawable.ic_menu_more, "Mais opções");
         overflow.setPadding(dp(8), dp(8), dp(8), dp(8));
         overflow.setOnClickListener(v -> showTrackMenu(v, track));
         row.addView(overflow, new LinearLayout.LayoutParams(dp(46), dp(48)));
-
         row.setOnClickListener(v -> play(track));
         return row;
     }
+
 
 
     private boolean isCustomPlaylist(String name) {
@@ -1570,11 +1579,11 @@ public class MainActivity extends ComponentActivity {
     }
 
     private String safeTitle(Track track) {
-        return track == null || track.title == null || track.title.trim().isEmpty() ? "Untitled" : track.title;
+        return track == null || track.title == null || track.title.trim().isEmpty() ? "Sem título" : track.title;
     }
 
     private String safeArtist(Track track) {
-        return track == null || track.artist == null || track.artist.trim().isEmpty() ? "Unknown artist" : track.artist;
+        return track == null || track.artist == null || track.artist.trim().isEmpty() ? "Artista desconhecido" : track.artist;
     }
 
     private List<Track> sortedByPlayCount() {
@@ -1588,13 +1597,13 @@ public class MainActivity extends ComponentActivity {
     }
 
     private List<Track> suggestionTracks() {
-        List<Track> result = new ArrayList<>();
+        List<Track> resultado = new ArrayList<>();
         for (Track track : tracks) {
             if (currentTrack != null && track.id == currentTrack.id) continue;
-            if (!result.contains(track)) result.add(track);
-            if (result.size() >= 8) break;
+            if (!resultado.contains(track)) resultado.add(track);
+            if (resultado.size() >= 8) break;
         }
-        return result;
+        return resultado;
     }
 
     private int countFavorites() {
@@ -1651,7 +1660,6 @@ public class MainActivity extends ComponentActivity {
         if (next) playQueue.add(0, track);
         else playQueue.add(track);
     }
-
 
 
 
@@ -1840,23 +1848,23 @@ public class MainActivity extends ComponentActivity {
     }
 
     private List<Track> getPlaylistTracks(String name) {
-        List<Track> result = new ArrayList<>();
+        List<Track> resultado = new ArrayList<>();
         String value = getSharedPreferences("auren_player", MODE_PRIVATE)
                 .getString("playlist_" + name, "");
-        if (value == null || value.trim().isEmpty()) return result;
+        if (value == null || value.trim().isEmpty()) return resultado;
         for (String idValue : value.split(",")) {
             try {
                 long id = Long.parseLong(idValue.trim());
                 for (Track track : tracks) {
                     if (track.id == id) {
-                        result.add(track);
+                        resultado.add(track);
                         break;
                     }
                 }
             } catch (NumberFormatException ignored) {
             }
         }
-        return result;
+        return resultado;
     }
 
     private long playlistDuration(List<Track> items) {
@@ -1878,11 +1886,11 @@ public class MainActivity extends ComponentActivity {
 
     private void showMostPlayed() {
         showLibrary();
-        Toast.makeText(this, "Most played is ranked on the Home screen.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Mais tocadas is ranked on the Início screen.", Toast.LENGTH_SHORT).show();
     }
 
     private void showLibraryIfNeeded() {
-        // Favorite state is persisted; the current page remains unchanged.
+        // Favoritar state is persisted; the current page remains unchanged.
     }
 
     private int progressValue() {
@@ -1958,13 +1966,25 @@ public class MainActivity extends ComponentActivity {
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
-
-    @Override protected void onDestroy() {
+    @Override
+    protected void onDestroy() {
         handler.removeCallbacks(progressUpdater);
-        if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) nowPlayingDialog.dismiss();
-        if (player != null) player.release();
+        if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) {
+            nowPlayingDialog.dismiss();
+        }
+        if (player != null) {
+            player.removeListener(playbackListener);
+        }
+        if (mediaController != null) {
+            mediaController.release();
+            mediaController = null;
+        }
+        if (controllerFuture != null && !controllerFuture.isDone()) {
+            controllerFuture.cancel(false);
+        }
         super.onDestroy();
     }
+
 
     private static class Track {
         final long id;
