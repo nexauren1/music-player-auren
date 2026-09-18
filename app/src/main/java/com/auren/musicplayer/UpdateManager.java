@@ -83,7 +83,7 @@ public final class UpdateManager {
         new android.app.AlertDialog.Builder(activity)
                 .setTitle("Atualização disponível")
                 .setMessage("A versão " + release.tag
-                        + " está disponível. O Auren vai baixar o APK e abrir o instalador oficial do Android.")
+                        + " está disponível. A Nexauren vai baixar o APK e abrir o instalador oficial do Android.")
                 .setNegativeButton("Agora não", (dialog, which) -> finish(callback))
                 .setPositiveButton("Atualizar", (dialog, which) ->
                         downloadAndInstall(activity, status, release.apk, release.tag, callback))
@@ -121,7 +121,7 @@ public final class UpdateManager {
     private static File download(Activity activity, TextView status,
                                  String address, String version) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
-        connection.setRequestProperty("User-Agent", "Auren-Music-Player");
+        connection.setRequestProperty("User-Agent", "Nexauren-Music-Player");
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(30000);
         connection.setInstanceFollowRedirects(true);
@@ -181,7 +181,7 @@ public final class UpdateManager {
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             PackageManager pm = activity.getPackageManager();
             if (!pm.canRequestPackageInstalls()) {
-                status.setText("Permita instalações do Auren e volte para concluir a atualização.");
+                status.setText("Permita instalações da Nexauren e volte para concluir a atualização.");
                 Intent settings = new Intent(
                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:" + activity.getPackageName())
@@ -228,7 +228,7 @@ public final class UpdateManager {
     private static String request(String address) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
         connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setRequestProperty("User-Agent", "Auren-Music-Player");
+        connection.setRequestProperty("User-Agent", "Nexauren-Music-Player");
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(15000);
         try (InputStream in = connection.getInputStream();
