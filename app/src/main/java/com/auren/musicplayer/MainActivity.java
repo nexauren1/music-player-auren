@@ -601,6 +601,11 @@ public class MainActivity extends ComponentActivity {
             dialog.dismiss();
             startActivity(new Intent(this, EqualizerActivity.class));
         });
+        addDrawerItem(items, "↻", "Atualizar biblioteca", () -> {
+            dialog.dismiss();
+            loadMusic();
+            Toast.makeText(this, "Biblioteca atualizada.", Toast.LENGTH_SHORT).show();
+        });
         addDrawerItem(items, "⚙", "Configurações", () -> {
             dialog.dismiss();
             startActivity(new Intent(this, SettingsActivity.class));
@@ -1172,11 +1177,16 @@ public class MainActivity extends ComponentActivity {
             return;
         }
 
+        boolean newPlayEvent = currentTrack == null
+                || currentTrack.id != track.id
+                || player.getPlaybackState() == Player.STATE_ENDED;
         currentTrack = track;
-        playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
-        recentTracks.remove(track);
-        recentTracks.add(0, track);
-        while (recentTracks.size() > 20) recentTracks.remove(recentTracks.size() - 1);
+        if (newPlayEvent) {
+            playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
+            recentTracks.remove(track);
+            recentTracks.add(0, track);
+            while (recentTracks.size() > 20) recentTracks.remove(recentTracks.size() - 1);
+        }
         persistListeningState(track);
 
         Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, track.id);
