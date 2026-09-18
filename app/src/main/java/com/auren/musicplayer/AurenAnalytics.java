@@ -660,7 +660,7 @@ public final class AurenAnalytics {
                 i++) {
 
             if (keep.length() > 0) {
-                keep.append('\\n');
+                keep.append('\n');
             }
 
             keep.append(lines[i]);
