@@ -71,9 +71,9 @@ public final class ThemeManager {
 
         return shiftHue(
                 accent(context),
-                26f,
-                0.92f,
-                0.10f);
+                22f,
+                0.82f,
+                0.88f);
     }
 
     public static int surface(
@@ -102,8 +102,8 @@ public final class ThemeManager {
                 accent(context),
                 base,
                 isDark(context)
-                        ? 0.075f
-                        : 0.065f);
+                        ? 0.09f
+                        : 0.075f);
     }
 
     public static int card(
@@ -117,8 +117,8 @@ public final class ThemeManager {
                 accent(context),
                 base,
                 isDark(context)
-                        ? 0.13f
-                        : 0.075f);
+                        ? 0.16f
+                        : 0.055f);
     }
 
     public static int accentSoft(
@@ -158,8 +158,15 @@ public final class ThemeManager {
                 accent(context),
                 surface(context),
                 isDark(context)
-                        ? 0.30f
-                        : 0.18f);
+                        ? 0.34f
+                        : 0.21f);
+    }
+
+    public static int selectedSurface(Context context) {
+        return blend(
+                accent(context),
+                surfaceAlt(context),
+                isDark(context) ? 0.26f : 0.14f);
     }
 
     public static int outline(
