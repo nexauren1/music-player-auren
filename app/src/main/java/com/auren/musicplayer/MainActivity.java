@@ -3633,18 +3633,7 @@ public class MainActivity extends ComponentActivity {
 
         return card;
     }
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] resultados) {
-        super.onRequestPermissionsResult(requestCode, permissions, resultados);
-        if (requestCode == MUSIC_PERMISSION && resultados.length > 0
-                && resultados[0] == PackageManager.PERMISSION_GRANTED) {
-            loadMusic();
-        } else if (requestCode == MUSIC_PERMISSION) {
-            Toast.makeText(this,
-                    "É necessária a permissão de música para mostrar a sua biblioteca.",
-                    Toast.LENGTH_LONG).show();
-        }
-    }
+    
 
 
     private void updateAlbumAchievement() {
@@ -4728,6 +4717,17 @@ public class MainActivity extends ComponentActivity {
         button.setPadding(dp(10), dp(10), dp(10), dp(10));
         DrawableCompat.setTint(button.getDrawable(), ThemeManager.resolve(this, R.color.text_primary));
         return button;
+    }
+
+    private Button button(String label) {
+        Button view = new Button(this);
+        view.setText(label);
+        view.setTextSize(13);
+        view.setAllCaps(false);
+        view.setTextColor(ThemeManager.resolve(this, R.color.text_on_accent));
+        view.setBackground(roundDrawable(ThemeManager.resolve(this, R.color.auren_primary), 14));
+        view.setPadding(dp(12), dp(6), dp(12), dp(6));
+        return view;
     }
 
     private TextView text(String value, float size, int color) {
