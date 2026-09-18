@@ -163,6 +163,10 @@ public class MainActivity extends ComponentActivity {
         connectPlaybackController();
         requestMusicPermission();
         handler.post(progressUpdater);
+        UpdateManager.checkForUpdates(this);
+        if (savedInstanceState == null && intentHasUpdateAction(getIntent())) {
+            handleUpdateIntent(getIntent());
+        }
     }
 
     private void connectPlaybackController() {
@@ -185,6 +189,20 @@ public class MainActivity extends ComponentActivity {
                         Toast.makeText(this, "Não foi possível iniciar o mecanismo de áudio.", Toast.LENGTH_LONG).show());
             }
         }, Runnable::run);
+    }
+
+    private boolean intentHasUpdateAction(Intent intent) {
+        return intent != null && intent.getStringExtra("nexauren_update_action") != null;
+    }
+
+    private void handleUpdateIntent(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getStringExtra("nexauren_update_action");
+        if ("install_ready".equals(action)) {
+            UpdateManager.tryInstallPendingUpdate(this);
+        } else if ("show_update".equals(action)) {
+            UpdateManager.showPendingUpdateDialog(this);
+        }
     }
 
     @Override protected void onResume() {
