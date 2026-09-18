@@ -235,7 +235,7 @@ public class MainActivity extends ComponentActivity {
         menu.setOnClickListener(v -> showAppMenu(menu));
         bar.addView(menu, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
-        TextView title = text("Nexauren", 20, R.color.text_primary);
+        TextView title = text("Music Player - Nexauren", 17, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         bar.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1));
 
@@ -484,8 +484,115 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void showAchievementToast() {
-        Toast toast = Toast.makeText(this, "✨ Conquista desbloqueada!", Toast.LENGTH_SHORT);
-        toast.show();
+        final Dialog dialog =
+                new Dialog(this);
+
+        dialog.requestWindowFeature(
+                Window.FEATURE_NO_TITLE);
+
+        LinearLayout box =
+                rounded(
+                        ThemeManager.accentSoft(this),
+                        22);
+
+        box.setPadding(
+                dp(18),
+                dp(16),
+                dp(18),
+                dp(16));
+
+        TextView icon =
+                text(
+                        "🏆",
+                        28,
+                        R.color.auren_primary);
+
+        icon.setGravity(
+                Gravity.CENTER);
+
+        box.addView(
+                icon,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(42)));
+
+        TextView title =
+                text(
+                        "Conquista desbloqueada!",
+                        17,
+                        R.color.text_primary);
+
+        title.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD);
+
+        title.setGravity(
+                Gravity.CENTER);
+
+        box.addView(title);
+
+        TextView detail =
+                text(
+                        "O seu Nexauren Journey avançou.",
+                        12,
+                        R.color.text_secondary);
+
+        detail.setGravity(
+                Gravity.CENTER);
+
+        box.addView(
+                detail,
+                margins(0, 3, 0, 0));
+
+        dialog.setContentView(box);
+
+        Window window =
+                dialog.getWindow();
+
+        if (window != null) {
+            window.setBackgroundDrawableResource(
+                    android.R.color.transparent);
+            window.setDimAmount(0f);
+        }
+
+        dialog.show();
+
+        if (window != null) {
+            window.setLayout(
+                    Math.min(
+                            dp(290),
+                            getResources()
+                                    .getDisplayMetrics()
+                                    .widthPixels
+                                    - dp(40)),
+                    -2);
+        }
+
+        box.setAlpha(0f);
+        box.setScaleX(0.82f);
+        box.setScaleY(0.82f);
+
+        box.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(240)
+                .start();
+
+        handler.postDelayed(
+                () -> {
+                    if (dialog.isShowing()) {
+                        box.animate()
+                                .alpha(0f)
+                                .scaleX(0.95f)
+                                .scaleY(0.95f)
+                                .setDuration(180)
+                                .withEndAction(
+                                        dialog::dismiss)
+                                .start();
+                    }
+                },
+                1350);
     }
 
     private View intelligenceHomeCard() {
@@ -516,86 +623,334 @@ public class MainActivity extends ComponentActivity {
 
     private void showAnalyticsDashboard(String range) {
         pageContainer.removeAllViews();
+
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = column();
-        content.setPadding(dp(20), dp(18), dp(20), dp(26));
+        content.setPadding(
+                dp(20),
+                dp(18),
+                dp(20),
+                dp(26));
 
-        TextView eyebrow = text("NEXAUREN INTELLIGENCE", 11, R.color.auren_primary);
-        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView eyebrow = text(
+                "NEXAUREN INTELLIGENCE",
+                11,
+                R.color.auren_primary);
+        eyebrow.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD);
         content.addView(eyebrow);
-        TextView title = text("Estatísticas", 30, R.color.text_primary);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        content.addView(title, margins(0, 3, 0, 6));
-        content.addView(text("Hoje → Semana → Mês → Sempre", 13, R.color.text_secondary), margins(0, 0, 0, 14));
+
+        TextView title = text(
+                "Estatísticas",
+                30,
+                R.color.text_primary);
+        title.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD);
+        content.addView(
+                title,
+                margins(0, 3, 0, 6));
+
+        content.addView(
+                text(
+                        "Hoje → Semana → Mês → Sempre",
+                        13,
+                        R.color.text_secondary),
+                margins(0, 0, 0, 14));
 
         LinearLayout tabs = row();
-        String[] labels = {"Hoje", "Semana", "Mês", "Sempre"};
-        String[] ids = {"today", "week", "month", "all"};
-        for (int i = 0; i < labels.length; i++) {
-            final String target = ids[i];
-            View tab = chip(labels[i], target.equals(range), v -> showAnalyticsDashboard(target));
-            tabs.addView(tab, new LinearLayout.LayoutParams(0, dp(42), 1));
-        }
-        content.addView(tabs, margins(0, 0, 0, 14));
+        String[] labels = {
+                "Hoje",
+                "Semana",
+                "Mês",
+                "Sempre"
+        };
+        String[] ids = {
+                "today",
+                "week",
+                "month",
+                "all"
+        };
 
-        AurenAnalytics.Summary s = AurenAnalytics.summary(this);
-        long time = "today".equals(range) ? s.todayMs : "week".equals(range) ? s.weekMs
-                : "all".equals(range) ? s.totalMs : s.monthMs;
-        int plays = "today".equals(range) ? s.todayPlays : "week".equals(range) ? s.weekPlays
-                : "all".equals(range) ? s.totalPlays : s.monthPlays;
+        for (int i = 0;
+                i < labels.length;
+                i++) {
+
+            final String target = ids[i];
+            View tab = chip(
+                    labels[i],
+                    target.equals(range),
+                    v -> showAnalyticsDashboard(target));
+
+            tabs.addView(
+                    tab,
+                    new LinearLayout.LayoutParams(
+                            0,
+                            dp(42),
+                            1));
+        }
+
+        content.addView(
+                tabs,
+                margins(0, 0, 0, 14));
+
+        AurenAnalytics.Summary s =
+                AurenAnalytics.summary(this);
+
+        long time =
+                "today".equals(range)
+                        ? s.todayMs
+                        : "week".equals(range)
+                        ? s.weekMs
+                        : "all".equals(range)
+                        ? s.totalMs
+                        : s.monthMs;
+
+        int plays =
+                "today".equals(range)
+                        ? s.todayPlays
+                        : "week".equals(range)
+                        ? s.weekPlays
+                        : "all".equals(range)
+                        ? s.totalPlays
+                        : s.monthPlays;
 
         LinearLayout stats = row();
-        stats.addView(statCard("TEMPO", AurenAnalytics.formatDuration(time), "ouvido"), new LinearLayout.LayoutParams(0, dp(100), 1));
-        stats.addView(statCard("REPRODUÇÕES", String.valueOf(plays), "neste período"), margins(8, 0, 0, 0));
+        stats.addView(
+                statCard(
+                        "TEMPO",
+                        AurenAnalytics.formatDuration(time),
+                        "ouvido"),
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(100),
+                        1));
+
+        stats.addView(
+                statCard(
+                        "REPRODUÇÕES",
+                        String.valueOf(plays),
+                        "neste período"),
+                margins(8, 0, 0, 0));
+
         content.addView(stats);
 
         LinearLayout stats2 = row();
-        AchievementManager.Stats a = AchievementManager.stats(this);
-        stats2.addView(statCard("SEQUÊNCIA", AurenAnalytics.summary(this).streakCurrent + " dia(s)", "Nexauren Journey"), new LinearLayout.LayoutParams(0, dp(92), 1));
-        stats2.addView(statCard("MÚSICAS", String.valueOf(a.uniqueTracks), "diferentes"), margins(8, 0, 0, 0));
-        content.addView(stats2, margins(0, 8, 0, 14));
+        AchievementManager.Stats a =
+                AchievementManager.stats(this);
 
-        content.addView(featureSectionTitle("Top 5 músicas por tempo ouvido"));
-        List<AurenAnalytics.TrackScore> topTracks = AurenAnalytics.topTracks(this, analyticsTracks(), range, 5);
-        if (topTracks.isEmpty()) content.addView(emptyCard("Ainda não há tempo suficiente para um ranking."));
-        for (AurenAnalytics.TrackScore t : topTracks) content.addView(trackAnalyticsRow(t));
+        stats2.addView(
+                statCard(
+                        "SEQUÊNCIA",
+                        s.streakCurrent + " dia(s)",
+                        "Nexauren Journey"),
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(92),
+                        1));
 
-        content.addView(featureSectionTitle("Top artistas"));
-        for (AurenAnalytics.AggregateScore a1 : AurenAnalytics.aggregateByArtist(this, analyticsTracks(), 5))
-            content.addView(simpleAnalyticsRow(a1.name, AurenAnalytics.formatDuration(a1.timeMs)));
+        stats2.addView(
+                statCard(
+                        "MÚSICAS",
+                        String.valueOf(a.uniqueTracks),
+                        "diferentes"),
+                margins(8, 0, 0, 0));
 
-        content.addView(featureSectionTitle("Top álbuns"));
-        for (AurenAnalytics.AggregateScore a2 : AurenAnalytics.aggregateByAlbum(this, analyticsTracks(), 5))
-            content.addView(simpleAnalyticsRow(a2.name, AurenAnalytics.formatDuration(a2.timeMs)));
+        content.addView(
+                stats2,
+                margins(0, 8, 0, 14));
 
-        content.addView(featureSectionTitle("Top géneros"));
-        for (AurenAnalytics.AggregateScore a3 : AurenAnalytics.aggregateByGenre(this, analyticsTracks(), 5))
-            content.addView(simpleAnalyticsRow(a3.name, AurenAnalytics.formatDuration(a3.timeMs)));
+        content.addView(
+                featureSectionTitle(
+                        "Top 5 músicas por reproduções"));
 
-        content.addView(featureSectionTitle("O que ouvi ontem à noite"));
+        List<AurenAnalytics.TrackScore> topByPlays =
+                AurenAnalytics.topTracksByPlays(
+                        this,
+                        analyticsTracks(),
+                        range,
+                        5);
+
+        if (topByPlays.isEmpty()) {
+            content.addView(
+                    emptyCard(
+                            "Ainda não há reproduções suficientes para este período."));
+        }
+
+        for (AurenAnalytics.TrackScore t
+                : topByPlays) {
+
+            content.addView(
+                    trackAnalyticsRow(t));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Top 5 músicas por tempo ouvido"));
+
+        List<AurenAnalytics.TrackScore> topByTime =
+                AurenAnalytics.topTracks(
+                        this,
+                        analyticsTracks(),
+                        range,
+                        5);
+
+        for (AurenAnalytics.TrackScore t
+                : topByTime) {
+
+            content.addView(
+                    trackAnalyticsRow(t));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Top artistas"));
+
+        for (AurenAnalytics.AggregateScore item
+                : AurenAnalytics.aggregateByArtist(
+                        this,
+                        analyticsTracks(),
+                        5,
+                        range)) {
+
+            content.addView(
+                    simpleAnalyticsRow(
+                            item.name,
+                            AurenAnalytics.formatDuration(
+                                    item.timeMs)));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Top álbuns"));
+
+        for (AurenAnalytics.AggregateScore item
+                : AurenAnalytics.aggregateByAlbum(
+                        this,
+                        analyticsTracks(),
+                        5,
+                        range)) {
+
+            content.addView(
+                    simpleAnalyticsRow(
+                            item.name,
+                            AurenAnalytics.formatDuration(
+                                    item.timeMs)));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Top géneros"));
+
+        for (AurenAnalytics.AggregateScore item
+                : AurenAnalytics.aggregateByGenre(
+                        this,
+                        analyticsTracks(),
+                        5,
+                        range)) {
+
+            content.addView(
+                    simpleAnalyticsRow(
+                            item.name,
+                            AurenAnalytics.formatDuration(
+                                    item.timeMs)));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Atividade dos últimos 7 dias"));
+
+        content.addView(
+                analyticsWeekActivity());
+
+        content.addView(
+                featureSectionTitle(
+                        "O que ouvi ontem à noite"));
+
         boolean foundNight = false;
         long nowMs = System.currentTimeMillis();
-        for (AurenAnalytics.Session session : AurenAnalytics.sessions(this)) {
-            long age = nowMs - session.startMs;
-            java.util.Calendar cal = java.util.Calendar.getInstance();
-            cal.setTimeInMillis(session.startMs);
-            int hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
-            if (age >= 0 && age <= 7L * 86400000L && (hour >= 20 || hour < 5)) {
-                foundNight = true;
-                content.addView(sessionRow(session));
-            }
-            if (foundNight && content.getChildCount() > 45) break;
-        }
-        if (!foundNight) content.addView(emptyCard("Quando houver uma sessão noturna, ela aparecerá aqui."));
 
-        content.addView(featureSectionTitle("Favoritos automáticos"));
-        for (Track t : automaticFavoriteTracks())
-            content.addView(trackInsightRow(t, "Tendência automática"));
-        content.addView(featureSectionTitle("Repartição visual"));
-        content.addView(analyticsBars(s.todayMs, s.weekMs, s.monthMs));
+        for (AurenAnalytics.Session session
+                : AurenAnalytics.sessions(this)) {
+
+            long age =
+                    nowMs - session.startMs;
+
+            java.util.Calendar cal =
+                    java.util.Calendar.getInstance();
+
+            cal.setTimeInMillis(
+                    session.startMs);
+
+            int hour =
+                    cal.get(
+                            java.util.Calendar.HOUR_OF_DAY);
+
+            if (age >= 0
+                    && age <= 7L * 86400000L
+                    && (hour >= 20 || hour < 5)) {
+
+                foundNight = true;
+                content.addView(
+                        sessionRow(session));
+            }
+
+            if (foundNight
+                    && content.getChildCount() > 52) {
+                break;
+            }
+        }
+
+        if (!foundNight) {
+            content.addView(
+                    emptyCard(
+                            "Quando houver uma sessão noturna, ela aparecerá aqui."));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Favoritos automáticos"));
+
+        List<Track> autoFavorites =
+                automaticFavoriteTracks();
+
+        if (autoFavorites.isEmpty()) {
+            content.addView(
+                    emptyCard(
+                            "O Auren começa a reconhecer tendências depois de algumas reproduções."));
+        }
+
+        for (Track t : autoFavorites) {
+            content.addView(
+                    trackInsightRow(
+                            t,
+                            playCounts.getOrDefault(
+                                    t.id,
+                                    0)
+                                    + " plays • "
+                                    + AurenAnalytics.formatDuration(
+                                            AurenAnalytics.trackTime(
+                                                    this,
+                                                    t.id))));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Repartição visual"));
+
+        content.addView(
+                analyticsBars(
+                        s.todayMs,
+                        s.weekMs,
+                        s.monthMs));
 
         scroll.addView(content);
-        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+        pageContainer.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -1));
     }
 
     private View trackAnalyticsRow(AurenAnalytics.TrackScore track) {
@@ -630,6 +985,24 @@ public class MainActivity extends ComponentActivity {
         return row;
     }
 
+    private List<Track> tracksFromScores(
+            List<AurenAnalytics.TrackScore> scores) {
+
+        List<Track> result =
+                new ArrayList<>();
+
+        for (AurenAnalytics.TrackScore score : scores) {
+            Track track =
+                    findTrack(score.id);
+
+            if (track != null) {
+                result.add(track);
+            }
+        }
+
+        return result;
+    }
+
     private View trackInsightRow(Track track, String label) {
         LinearLayout row = rounded(ThemeManager.resolve(this, R.color.accent_soft), 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -643,15 +1016,208 @@ public class MainActivity extends ComponentActivity {
     }
 
     private View sessionRow(AurenAnalytics.Session session) {
-        java.text.DateFormat df = new java.text.SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
-        LinearLayout row = rounded(ThemeManager.card(this), 16);
-        row.setPadding(dp(12), dp(9), dp(12), dp(9));
-        int count = session.trackIds.isEmpty() ? 0 : session.trackIds.split(",").length;
-        row.addView(text(df.format(new java.util.Date(session.startMs)) + " • " + count + " músicas",
-                13, R.color.text_primary));
-        row.addView(text(AurenAnalytics.formatDuration(session.durationMs), 11, R.color.auren_primary),
-                margins(0, 3, 0, 0));
+        java.text.DateFormat df =
+                new java.text.SimpleDateFormat(
+                        "dd/MM HH:mm",
+                        Locale.getDefault());
+
+        LinearLayout row =
+                rounded(
+                        ThemeManager.card(this),
+                        16);
+
+        row.setPadding(
+                dp(12),
+                dp(9),
+                dp(12),
+                dp(9));
+
+        int count =
+                session.trackIds.isEmpty()
+                        ? 0
+                        : session.trackIds.split(",").length;
+
+        StringBuilder titles =
+                new StringBuilder();
+
+        if (!session.trackIds.isEmpty()) {
+            String[] ids =
+                    session.trackIds.split(",");
+
+            for (int i = 0;
+                    i < ids.length
+                    && i < 3;
+                    i++) {
+
+                try {
+                    long id =
+                            Long.parseLong(
+                                    ids[i]);
+
+                    Track track =
+                            findTrack(id);
+
+                    if (track != null) {
+                        if (titles.length() > 0) {
+                            titles.append(" • ");
+                        }
+
+                        titles.append(
+                                safeTitle(track));
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+
+        LinearLayout info = column();
+
+        info.addView(
+                text(
+                        df.format(
+                                new java.util.Date(
+                                        session.startMs))
+                                + " • "
+                                + count
+                                + " músicas",
+                        13,
+                        R.color.text_primary));
+
+        String detail =
+                titles.length() > 0
+                        ? titles.toString()
+                        : "Sessão local";
+
+        info.addView(
+                text(
+                        detail,
+                        11,
+                        R.color.text_secondary),
+                margins(0, 2, 0, 0));
+
+        row.addView(
+                info,
+                new LinearLayout.LayoutParams(
+                        0,
+                        -2,
+                        1));
+
+        row.addView(
+                text(
+                        AurenAnalytics.formatDuration(
+                                session.durationMs),
+                        11,
+                        R.color.auren_primary),
+                new LinearLayout.LayoutParams(
+                        dp(78),
+                        dp(44)));
+
         return row;
+    }
+
+    private View analyticsWeekActivity() {
+        LinearLayout box = rounded(
+                ThemeManager.card(this),
+                18);
+        box.setPadding(
+                dp(14),
+                dp(12),
+                dp(14),
+                dp(12));
+
+        long maxTime = 1L;
+        for (int i = 0; i < 7; i++) {
+            maxTime = Math.max(
+                    maxTime,
+                    AurenAnalytics.timeForDay(
+                            this,
+                            i));
+        }
+
+        java.text.DateFormat df =
+                new java.text.SimpleDateFormat(
+                        "EEE",
+                        Locale.getDefault());
+
+        for (int i = 6; i >= 0; i--) {
+            java.util.Calendar day =
+                    java.util.Calendar.getInstance();
+            day.add(
+                    java.util.Calendar.DAY_OF_YEAR,
+                    -i);
+
+            String label =
+                    df.format(
+                            day.getTime())
+                            .replace(".", "");
+
+            long time =
+                    AurenAnalytics.timeForDay(
+                            this,
+                            i);
+
+            int pct =
+                    (int) Math.max(
+                            time == 0L ? 0 : 4L,
+                            Math.min(
+                                    100L,
+                                    time * 100L / maxTime));
+
+            LinearLayout line = row();
+            line.setGravity(
+                    Gravity.CENTER_VERTICAL);
+
+            TextView dayText = text(
+                    label,
+                    11,
+                    R.color.text_secondary);
+            dayText.setGravity(
+                    Gravity.CENTER_VERTICAL);
+
+            line.addView(
+                    dayText,
+                    new LinearLayout.LayoutParams(
+                            dp(42),
+                            dp(32)));
+
+            ProgressBar bar =
+                    new ProgressBar(
+                            this,
+                            null,
+                            android.R.attr.progressBarStyleHorizontal);
+
+            bar.setMax(100);
+            bar.setProgress(pct);
+            bar.setProgressTintList(
+                    android.content.res.ColorStateList
+                            .valueOf(
+                                    ThemeManager.accent(this)));
+
+            line.addView(
+                    bar,
+                    new LinearLayout.LayoutParams(
+                            0,
+                            dp(26),
+                            1));
+
+            int plays =
+                    AurenAnalytics.playsForDay(
+                            this,
+                            i);
+
+            line.addView(
+                    text(
+                            String.valueOf(plays),
+                            11,
+                            R.color.text_secondary),
+                    new LinearLayout.LayoutParams(
+                            dp(38),
+                            dp(32)));
+
+            box.addView(line);
+        }
+
+        return box;
     }
 
     private View analyticsBars(long today, long week, long month) {
@@ -695,18 +1261,70 @@ public class MainActivity extends ComponentActivity {
     }
 
     private List<Track> automaticFavoriteTracks() {
-        List<Track> result = new ArrayList<>();
+        List<Track> result =
+                new ArrayList<>();
+
         for (Track t : tracks) {
-            int plays = playCounts.getOrDefault(t.id, 0);
-            long minutes = AurenAnalytics.trackTime(this, t.id) / 60000L;
-            if (plays >= 3 || minutes >= 15L) result.add(t);
+            int plays =
+                    Math.max(
+                            playCounts.getOrDefault(
+                                    t.id,
+                                    0),
+                            AurenAnalytics.trackPlayCount(
+                                    this,
+                                    t.id));
+
+            long minutes =
+                    AurenAnalytics.trackTime(
+                            this,
+                            t.id)
+                            / 60000L;
+
+            if (plays >= 3
+                    || minutes >= 15L) {
+                result.add(t);
+            }
         }
-        Collections.sort(result, (x, y) -> {
-            long sx = AurenAnalytics.trackTime(this, x.id) + playCounts.getOrDefault(x.id, 0) * 60000L;
-            long sy = AurenAnalytics.trackTime(this, y.id) + playCounts.getOrDefault(y.id, 0) * 60000L;
-            return Long.compare(sy, sx);
-        });
-        return result.subList(0, Math.min(8, result.size()));
+
+        Collections.sort(
+                result,
+                (x, y) -> {
+                    long sx =
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    x.id)
+                                    + Math.max(
+                                    playCounts.getOrDefault(
+                                            x.id,
+                                            0),
+                                    AurenAnalytics.trackPlayCount(
+                                            this,
+                                            x.id))
+                                    * 60000L;
+
+                    long sy =
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    y.id)
+                                    + Math.max(
+                                    playCounts.getOrDefault(
+                                            y.id,
+                                            0),
+                                    AurenAnalytics.trackPlayCount(
+                                            this,
+                                            y.id))
+                                    * 60000L;
+
+                    return Long.compare(
+                            sy,
+                            sx);
+                });
+
+        return result.subList(
+                0,
+                Math.min(
+                        8,
+                        result.size()));
     }
 
     private LinearLayout featureScreen(String title, String subtitle) {
@@ -755,21 +1373,88 @@ public class MainActivity extends ComponentActivity {
 
     private List<Track> buildSmartQueue() {
         playQueue.clear();
-        List<Track> pool = new ArrayList<>(tracks);
-        final int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
-        Collections.sort(pool, (a, b) -> {
-            long as = AurenAnalytics.hourScore(this, a.id, hour) * 100000L
-                    + playCounts.getOrDefault(a.id, 0) * 5000L
-                    + AurenAnalytics.trackTime(this, a.id) / 1000L;
-            long bs = AurenAnalytics.hourScore(this, b.id, hour) * 100000L
-                    + playCounts.getOrDefault(b.id, 0) * 5000L
-                    + AurenAnalytics.trackTime(this, b.id) / 1000L;
-            return Long.compare(bs, as);
-        });
-        if (currentTrack != null) pool.remove(currentTrack);
-        int count = Math.min(12, pool.size());
-        List<Track> selected = new ArrayList<>(pool.subList(0, count));
-        if (selected.size() > 3) Collections.shuffle(selected);
+
+        if (tracks.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        final int hour =
+                java.util.Calendar.getInstance()
+                        .get(java.util.Calendar.HOUR_OF_DAY);
+
+        List<Track> pool =
+                new ArrayList<>(tracks);
+
+        if (currentTrack != null) {
+            pool.remove(currentTrack);
+        }
+
+        Collections.sort(
+                pool,
+                (a, b) -> {
+                    long scoreA =
+                            AurenAnalytics.hourScore(
+                                    this,
+                                    a.id,
+                                    hour) * 140000L
+                                    + AurenAnalytics.trackPlayCount(
+                                            this,
+                                            a.id) * 9000L
+                                    + AurenAnalytics.trackTime(
+                                            this,
+                                            a.id) / 1000L;
+
+                    long scoreB =
+                            AurenAnalytics.hourScore(
+                                    this,
+                                    b.id,
+                                    hour) * 140000L
+                                    + AurenAnalytics.trackPlayCount(
+                                            this,
+                                            b.id) * 9000L
+                                    + AurenAnalytics.trackTime(
+                                            this,
+                                            b.id) / 1000L;
+
+                    return Long.compare(
+                            scoreB,
+                            scoreA);
+                });
+
+        List<Track> selected =
+                new ArrayList<>();
+
+        String previousArtist = "";
+
+        while (!pool.isEmpty()
+                && selected.size() < 12) {
+
+            int pick = 0;
+
+            if (!previousArtist.isEmpty()) {
+                for (int i = 0;
+                        i < pool.size();
+                        i++) {
+
+                    if (!safeArtist(
+                            pool.get(i))
+                            .equalsIgnoreCase(
+                                    previousArtist)) {
+
+                        pick = i;
+                        break;
+                    }
+                }
+            }
+
+            Track next =
+                    pool.remove(pick);
+
+            selected.add(next);
+            previousArtist =
+                    safeArtist(next);
+        }
+
         playQueue.addAll(selected);
         return selected;
     }
@@ -799,69 +1484,322 @@ public class MainActivity extends ComponentActivity {
 
     private void showAurenMemories() {
         pageContainer.removeAllViews();
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout content = featureScreen("Nexauren Memories", "Pequenas memórias da sua própria biblioteca.");
-        AurenAnalytics.Summary s = AurenAnalytics.summary(this);
-        content.addView(featureMetricCard("Nos últimos 7 dias", AurenAnalytics.formatDuration(s.weekMs), s.weekPlays + " reproduções"));
-        content.addView(featureSectionTitle("O que ouvi ontem à noite"));
-        long now = System.currentTimeMillis();
-        int shown = 0;
-        for (AurenAnalytics.Session session : AurenAnalytics.sessions(this)) {
-            long age = now - session.startMs;
-            java.util.Calendar cal = java.util.Calendar.getInstance();
-            cal.setTimeInMillis(session.startMs);
-            int hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
-            if (age >= 0 && age <= 8L * 86400000L && (hour >= 20 || hour < 5)) {
-                content.addView(sessionRow(session));
-                if (++shown >= 8) break;
+
+        ScrollView scroll =
+                new ScrollView(this);
+
+        LinearLayout content =
+                featureScreen(
+                        "Nexauren Memories",
+                        "Pequenas memórias da sua própria biblioteca.");
+
+        AurenAnalytics.Summary s =
+                AurenAnalytics.summary(this);
+
+        content.addView(
+                featureMetricCard(
+                        "Nos últimos 7 dias",
+                        AurenAnalytics.formatDuration(
+                                s.weekMs),
+                        s.weekPlays + " reproduções"));
+
+        content.addView(
+                featureSectionTitle(
+                        "Há 7 dias"));
+
+        List<AurenAnalytics.TrackScore> weekAgo =
+                AurenAnalytics.topTracksForDay(
+                        this,
+                        analyticsTracks(),
+                        7,
+                        5);
+
+        if (weekAgo.isEmpty()) {
+            content.addView(
+                    emptyCard(
+                            "Há 7 dias ainda não existe memória registada."));
+        } else {
+            for (AurenAnalytics.TrackScore score
+                    : weekAgo) {
+
+                Track track =
+                        findTrack(score.id);
+
+                if (track != null) {
+                    content.addView(
+                            trackInsightRow(
+                                    track,
+                                    score.plays
+                                            + " reproduções"));
+                }
             }
         }
-        if (shown == 0) content.addView(emptyCard("Ainda não há uma sessão noturna guardada."));
+
+        content.addView(
+                featureSectionTitle(
+                        "O que ouvi ontem à noite"));
+
+        long now =
+                System.currentTimeMillis();
+
+        int shown = 0;
+
+        for (AurenAnalytics.Session session
+                : AurenAnalytics.sessions(this)) {
+
+            long age =
+                    now - session.startMs;
+
+            java.util.Calendar cal =
+                    java.util.Calendar.getInstance();
+
+            cal.setTimeInMillis(
+                    session.startMs);
+
+            int hour =
+                    cal.get(
+                            java.util.Calendar.HOUR_OF_DAY);
+
+            if (age >= 0
+                    && age <= 8L * 86400000L
+                    && (hour >= 20 || hour < 5)) {
+
+                content.addView(
+                        sessionRow(session));
+
+                if (++shown >= 8) {
+                    break;
+                }
+            }
+        }
+
+        if (shown == 0) {
+            content.addView(
+                    emptyCard(
+                            "Ainda não há uma sessão noturna guardada."));
+        }
+
         scroll.addView(content);
-        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+
+        pageContainer.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -1));
     }
 
     private void showAurenReplay() {
         pageContainer.removeAllViews();
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout content = featureScreen("Nexauren Replay", "O resumo musical do seu mês.");
-        AurenAnalytics.Summary s = AurenAnalytics.summary(this);
-        content.addView(featureMetricCard("Este mês", AurenAnalytics.formatDuration(s.monthMs), s.monthPlays + " reproduções"));
-        content.addView(featureMetricCard("Sempre", AurenAnalytics.formatDuration(s.totalMs), s.totalPlays + " reproduções"),
+
+        ScrollView scroll =
+                new ScrollView(this);
+
+        LinearLayout content =
+                featureScreen(
+                        "Nexauren Replay",
+                        "O resumo musical do seu mês, com repetição inteligente.");
+
+        AurenAnalytics.Summary s =
+                AurenAnalytics.summary(this);
+
+        content.addView(
+                featureMetricCard(
+                        "Este mês",
+                        AurenAnalytics.formatDuration(
+                                s.monthMs),
+                        s.monthPlays + " reproduções"));
+
+        content.addView(
+                featureMetricCard(
+                        "Sempre",
+                        AurenAnalytics.formatDuration(
+                                s.totalMs),
+                        s.totalPlays + " reproduções"),
                 margins(0, 8, 0, 8));
-        content.addView(featureSectionTitle("Top 5"));
-        for (AurenAnalytics.TrackScore t : AurenAnalytics.topTracks(this, analyticsTracks(), 5))
-            content.addView(trackAnalyticsRow(t));
-        content.addView(featureSectionTitle("Journey"));
-        content.addView(simpleAnalyticsRow("Sequência atual", s.streakCurrent + " dia(s)"));
-        content.addView(simpleAnalyticsRow("Melhor sequência", s.streakBest + " dia(s)"));
+
+        content.addView(
+                featureSectionTitle(
+                        "Replay para este horário"));
+
+        int hour =
+                java.util.Calendar.getInstance()
+                        .get(java.util.Calendar.HOUR_OF_DAY);
+
+        List<AurenAnalytics.TrackScore> hourTracks =
+                AurenAnalytics.topTracksForHour(
+                        this,
+                        analyticsTracks(),
+                        hour,
+                        5);
+
+        if (hourTracks.isEmpty()) {
+            content.addView(
+                    emptyCard(
+                            "Ainda não há histórico suficiente para aprender este horário."));
+        } else {
+            for (AurenAnalytics.TrackScore score
+                    : hourTracks) {
+
+                Track track =
+                        findTrack(score.id);
+
+                if (track != null) {
+                    content.addView(
+                            trackInsightRow(
+                                    track,
+                                    "ouvida "
+                                            + score.plays
+                                            + "× neste horário"));
+                }
+            }
+
+            content.addView(
+                    featureAction(
+                            "↻",
+                            "Repetir Replay",
+                            "Montar esta seleção na fila",
+                            v -> startQueue(
+                                    tracksFromScores(
+                                            hourTracks))));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Top 5 do mês"));
+
+        List<AurenAnalytics.TrackScore> top =
+                AurenAnalytics.topTracksByPlays(
+                        this,
+                        analyticsTracks(),
+                        "month",
+                        5);
+
+        for (AurenAnalytics.TrackScore t
+                : top) {
+
+            content.addView(
+                    trackAnalyticsRow(t));
+        }
+
+        content.addView(
+                featureSectionTitle(
+                        "Journey"));
+
+        content.addView(
+                simpleAnalyticsRow(
+                        "Sequência atual",
+                        s.streakCurrent + " dia(s)"));
+
+        content.addView(
+                simpleAnalyticsRow(
+                        "Melhor sequência",
+                        s.streakBest + " dia(s)"));
+
         scroll.addView(content);
-        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+
+        pageContainer.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -1));
     }
 
     private void showAurenDiscovery() {
         pageContainer.removeAllViews();
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout content = featureScreen("Nexauren Discovery", "Descubra o que a sua biblioteca ainda esconde.");
-        List<Track> list = new ArrayList<>(tracks);
-        Collections.sort(list, (a, b) -> {
-            long at = AurenAnalytics.trackTime(this, a.id);
-            long bt = AurenAnalytics.trackTime(this, b.id);
-            int ap = playCounts.getOrDefault(a.id, 0);
-            int bp = playCounts.getOrDefault(b.id, 0);
-            int cmp = Long.compare(at, bt);
-            return cmp != 0 ? cmp : Integer.compare(ap, bp);
-        });
-        content.addView(featureAction("⌕", "Descobrir agora", "Colocar músicas pouco ouvidas na fila", v -> startQueue(list)),
+
+        ScrollView scroll =
+                new ScrollView(this);
+
+        LinearLayout content =
+                featureScreen(
+                        "Nexauren Discovery",
+                        "Descubra o que a sua biblioteca ainda esconde.");
+
+        List<Track> list =
+                new ArrayList<>(tracks);
+
+        Collections.sort(
+                list,
+                (a, b) -> {
+                    int ap =
+                            AurenAnalytics.trackPlayCount(
+                                    this,
+                                    a.id);
+
+                    int bp =
+                            AurenAnalytics.trackPlayCount(
+                                    this,
+                                    b.id);
+
+                    if (ap != bp) {
+                        return Integer.compare(
+                                ap,
+                                bp);
+                    }
+
+                    long at =
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    a.id);
+
+                    long bt =
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    b.id);
+
+                    if (at != bt) {
+                        return Long.compare(
+                                at,
+                                bt);
+                    }
+
+                    return Long.compare(
+                            AurenAnalytics.lastPlayedAt(
+                                    this,
+                                    a.id),
+                            AurenAnalytics.lastPlayedAt(
+                                    this,
+                                    b.id));
+                });
+
+        content.addView(
+                featureAction(
+                        "⌕",
+                        "Descobrir agora",
+                        "Colocar músicas pouco ouvidas na fila",
+                        v -> startQueue(list)),
                 margins(0, 0, 0, 14));
-        for (int i = 0; i < Math.min(15, list.size()); i++) {
-            Track t = list.get(i);
-            String label = playCounts.getOrDefault(t.id, 0) == 0 ? "Nunca tocada" :
-                    playCounts.get(t.id) + " reproduções";
-            content.addView(trackInsightRow(t, label));
+
+        for (int i = 0;
+                i < Math.min(15, list.size());
+                i++) {
+
+            Track t =
+                    list.get(i);
+
+            int plays =
+                    AurenAnalytics.trackPlayCount(
+                            this,
+                            t.id);
+
+            String label =
+                    plays == 0
+                            ? "Nunca tocada"
+                            : plays + " reproduções";
+
+            content.addView(
+                    trackInsightRow(
+                            t,
+                            label));
         }
+
         scroll.addView(content);
-        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+
+        pageContainer.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -1));
     }
 
     private void showAurenMood() {
@@ -1189,8 +2127,8 @@ public class MainActivity extends ComponentActivity {
 
     private void showAboutDialog() {
         new AlertDialog.Builder(this)
-                .setTitle("Nexauren Music Player")
-                .setMessage("Um player de música moderno, feito para a sua biblioteca local.\n\nVersion " + BuildConfig.VERSION_NAME + "\n\nMusic that moves with you.")
+                .setTitle("Music Player - Nexauren")
+                .setMessage("Um player de música moderno, feito para a sua biblioteca local.\n\nVersão " + BuildConfig.VERSION_NAME + "\n\nMúsica que acompanha você.")
                 .setPositiveButton("Fechar", null)
                 .show();
     }
@@ -1482,7 +2420,7 @@ public class MainActivity extends ComponentActivity {
             togglePlayback();
             playPause.setImageResource(
                     player.isPlaying() ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
-            DrawableCompat.setTint(playPause.getDrawable(), Color.WHITE);
+            DrawableCompat.setTint(playPause.getDrawable(), ThemeManager.textOnAccent(this));
         });
         controls.addView(playPause, new LinearLayout.LayoutParams(dp(76), dp(76)));
 
@@ -1517,7 +2455,7 @@ public class MainActivity extends ComponentActivity {
                 new LinearLayout.LayoutParams(0, dp(52), 1));
         root.addView(featureRow, margins(0, 6, 0, 0));
 
-        TextView hint = text("Nexauren • Música que acompanha você", 11, R.color.text_secondary);
+        TextView hint = text("Music Player - Nexauren • Música que acompanha você", 11, R.color.text_secondary);
         hint.setGravity(Gravity.CENTER);
         root.addView(hint, margins(0, 10, 0, 0));
 
@@ -1822,6 +2760,7 @@ public class MainActivity extends ComponentActivity {
             AurenAnalytics.recordPlayStart(this, track.id, safeArtist(track));
             int beforeUnlocked = AchievementManager.stats(this).unlocked;
             AchievementManager.recordPlay(this, track.id);
+            updateAlbumAchievement();
             int afterUnlocked = AchievementManager.stats(this).unlocked;
             if (afterUnlocked > beforeUnlocked) showAchievementToast();
         }
@@ -1912,15 +2851,16 @@ public class MainActivity extends ComponentActivity {
         miniPlay.setImageResource(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
         miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                 ThemeManager.resolve(this, R.color.auren_primary)));
-        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
+        DrawableCompat.setTint(miniPlay.getDrawable(), ThemeManager.textOnAccent(this));
         if (miniFavorite != null) {
             boolean favorite = isFavorite(currentTrack);
             miniFavorite.setImageResource(favorite
                     ? android.R.drawable.btn_star_big_on
                     : android.R.drawable.btn_star_big_off);
             DrawableCompat.setTint(miniFavorite.getDrawable(),
-                    favorite ? ThemeManager.resolve(this, R.color.auren_primary)
-                            : ThemeManager.resolve(this, R.color.text_primary));
+                    favorite
+                            ? ThemeManager.accent(this)
+                            : ThemeManager.resolve(this, R.color.text_secondary));
         }
     }
 
@@ -2373,7 +3313,8 @@ public class MainActivity extends ComponentActivity {
         row.addView(info, new LinearLayout.LayoutParams(0, dp(56), 1));
 
         if (number > 0) {
-            TextView plays = text(playCounts.getOrDefault(track.id, 0) + " reproduções", 10, R.color.text_secondary);
+            int visiblePlays = Math.max(playCounts.getOrDefault(track.id, 0), AurenAnalytics.trackPlayCount(this, track.id));
+            TextView plays = text(visiblePlays + " reproduções", 10, R.color.text_secondary);
             plays.setGravity(Gravity.CENTER);
             row.addView(plays, new LinearLayout.LayoutParams(dp(72), dp(48)));
         }
@@ -2472,13 +3413,83 @@ public class MainActivity extends ComponentActivity {
     }
 
     private List<Track> suggestionTracks() {
-        List<Track> resultado = new ArrayList<>();
+        List<Track> resultado =
+                new ArrayList<>();
+
+        final int hour =
+                java.util.Calendar.getInstance()
+                        .get(java.util.Calendar.HOUR_OF_DAY);
+
         for (Track track : tracks) {
-            if (currentTrack != null && track.id == currentTrack.id) continue;
-            if (!resultado.contains(track)) resultado.add(track);
-            if (resultado.size() >= 8) break;
+            if (currentTrack != null
+                    && track.id == currentTrack.id) {
+                continue;
+            }
+
+            if (resultado.contains(track)) {
+                continue;
+            }
+
+            resultado.add(track);
         }
-        return resultado;
+
+        Collections.sort(
+                resultado,
+                (a, b) -> {
+                    int aHour =
+                            AurenAnalytics.hourScore(
+                                    this,
+                                    a.id,
+                                    hour);
+
+                    int bHour =
+                            AurenAnalytics.hourScore(
+                                    this,
+                                    b.id,
+                                    hour);
+
+                    int aPlays =
+                            AurenAnalytics.trackPlayCount(
+                                    this,
+                                    a.id);
+
+                    int bPlays =
+                            AurenAnalytics.trackPlayCount(
+                                    this,
+                                    b.id);
+
+                    long aTime =
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    a.id);
+
+                    long bTime =
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    b.id);
+
+                    if (aHour != bHour) {
+                        return Integer.compare(
+                                bHour,
+                                aHour);
+                    }
+
+                    if (aPlays != bPlays) {
+                        return Integer.compare(
+                                aPlays,
+                                bPlays);
+                    }
+
+                    return Long.compare(
+                            aTime,
+                            bTime);
+                });
+
+        return resultado.subList(
+                0,
+                Math.min(
+                        8,
+                        resultado.size()));
     }
 
     private int countFavorites() {
@@ -2870,8 +3881,105 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void showMostPlayed() {
-        showLibrary();
-        Toast.makeText(this, "Mais tocadas is ranked on the Início screen.", Toast.LENGTH_SHORT).show();
+        pageContainer.removeAllViews();
+
+        LinearLayout content = column();
+        content.setPadding(
+                dp(20),
+                dp(16),
+                dp(20),
+                dp(20));
+
+        TextView eyebrow = text(
+                "ATIVIDADE",
+                11,
+                R.color.auren_primary);
+        eyebrow.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD);
+
+        content.addView(eyebrow);
+
+        TextView title = text(
+                "Mais tocadas",
+                30,
+                R.color.text_primary);
+        title.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD);
+
+        content.addView(
+                title,
+                margins(0, 3, 0, 6));
+
+        AurenAnalytics.Summary s =
+                AurenAnalytics.summary(this);
+
+        content.addView(
+                text(
+                        s.totalPlays
+                                + " reproduções • "
+                                + AurenAnalytics.formatDuration(
+                                        s.totalMs)
+                                + " ouvidos no total",
+                        12,
+                        R.color.text_secondary),
+                margins(0, 0, 0, 14));
+
+        List<Track> sorted =
+                new ArrayList<>(tracks);
+
+        Collections.sort(
+                sorted,
+                (a, b) -> {
+                    int ap =
+                            AurenAnalytics.trackPlayCount(
+                                    this,
+                                    a.id);
+
+                    int bp =
+                            AurenAnalytics.trackPlayCount(
+                                    this,
+                                    b.id);
+
+                    if (ap != bp) {
+                        return Integer.compare(
+                                bp,
+                                ap);
+                    }
+
+                    return Long.compare(
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    b.id),
+                            AurenAnalytics.trackTime(
+                                    this,
+                                    a.id));
+                });
+
+        for (int i = 0;
+                i < Math.min(25, sorted.size());
+                i++) {
+
+            Track track =
+                    sorted.get(i);
+
+            content.addView(
+                    trackRow(
+                            track,
+                            i + 1));
+        }
+
+        ScrollView scroll =
+                new ScrollView(this);
+
+        scroll.addView(content);
+
+        pageContainer.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -1));
     }
 
     private void showLibraryIfNeeded() {
