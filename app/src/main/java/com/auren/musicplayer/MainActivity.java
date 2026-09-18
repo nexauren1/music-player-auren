@@ -1060,7 +1060,7 @@ public class MainActivity extends ComponentActivity {
         header.setPadding(dp(20), dp(28), dp(20), dp(20));
         header.setBackgroundColor(ThemeManager.resolve(this, R.color.auren_primary));
 
-        TextView brand = text("AUREN", 25, android.R.color.white);
+        TextView brand = text("NEXAUREN", 25, android.R.color.white);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         header.addView(brand);
         TextView subtitle = text("Music Player", 13, android.R.color.white);
@@ -1108,7 +1108,7 @@ public class MainActivity extends ComponentActivity {
             dialog.dismiss();
             startActivity(new Intent(this, SettingsActivity.class));
         });
-        addDrawerItem(items, "ⓘ", "Sobre Auren", () -> { dialog.dismiss(); showAboutDialog(); });
+        addDrawerItem(items, "ⓘ", "Sobre Nexauren", () -> { dialog.dismiss(); showAboutDialog(); });
 
         scroll.addView(items);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
