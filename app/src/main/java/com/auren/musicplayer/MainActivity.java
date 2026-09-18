@@ -357,6 +357,7 @@ public class MainActivity extends ComponentActivity {
                 homeStats.unlocked + "/" + homeStats.totalAchievements + " desbloqueadas",
                 v -> showAchievements());
         content.addView(homeAchievementCard(), margins(0, 0, 0, 2));
+        content.addView(autoFavoritesHomeCard(), margins(0, 0, 0, 10));
         content.addView(intelligenceHomeCard(), margins(0, 0, 0, 12));
 
         // AUREN_ALL_SONGS_HOME_START
@@ -593,6 +594,58 @@ public class MainActivity extends ComponentActivity {
                     }
                 },
                 1350);
+    }
+
+    private View autoFavoritesHomeCard() {
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
+        card.setPadding(dp(15), dp(13), dp(15), dp(13));
+        TextView title = text("NEXAUREN SMART FAVOURITES", 10, R.color.auren_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(title);
+        List<Track> smart = autoFavoriteTracks(3);
+        String main = smart.isEmpty() ? "Ainda está a aprender os seus hábitos" :
+                "A IA local encontrou " + smart.size() + " favoritas prováveis";
+        TextView mainText = text(main, 15, R.color.text_primary);
+        mainText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(mainText, margins(0, 4, 0, 2));
+        if (!smart.isEmpty()) {
+            StringBuilder names = new StringBuilder();
+            for (Track t : smart) {
+                if (names.length() > 0) names.append(" • ");
+                names.append(safeTitle(t));
+            }
+            card.addView(text(names.toString(), 11, R.color.text_secondary), margins(0, 2, 0, 0));
+        }
+        TextView action = text("Ver favoritas prováveis  ›", 12, R.color.auren_primary);
+        action.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(action, margins(0, 8, 0, 0));
+        card.setOnClickListener(v -> showAutoFavorites());
+        return card;
+    }
+
+    private List<Track> autoFavoriteTracks(int limit) {
+        List<Track> result = new ArrayList<>();
+        for (Track t : tracks) {
+            if (AurenAnalytics.isAutoFavorite(this, t.id)) result.add(t);
+        }
+        Collections.sort(result, (a,b) ->
+                Integer.compare(AurenAnalytics.favoriteConfidence(this,b.id),
+                        AurenAnalytics.favoriteConfidence(this,a.id)));
+        return result.subList(0, Math.min(limit, result.size()));
+    }
+
+    private void showAutoFavorites() {
+        pageContainer.removeAllViews();
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = featureScreen("Favoritas prováveis", "Sugestões baseadas apenas no seu comportamento. Os favoritos manuais não são alterados.");
+        List<Track> smart = autoFavoriteTracks(30);
+        if (smart.isEmpty()) content.addView(emptyCard("Continue ouvindo para o Nexauren aprender os seus padrões."));
+        for (Track t : smart) {
+            content.addView(trackInsightRow(t,
+                    AurenAnalytics.favoriteConfidence(this, t.id) + "% de afinidade"));
+        }
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1,-1));
     }
 
     private View intelligenceHomeCard() {
@@ -1393,28 +1446,16 @@ public class MainActivity extends ComponentActivity {
                 pool,
                 (a, b) -> {
                     long scoreA =
-                            AurenAnalytics.hourScore(
-                                    this,
-                                    a.id,
-                                    hour) * 140000L
-                                    + AurenAnalytics.trackPlayCount(
-                                            this,
-                                            a.id) * 9000L
-                                    + AurenAnalytics.trackTime(
-                                            this,
-                                            a.id) / 1000L;
+                            AurenAnalytics.hourScore(this, a.id, hour) * 140000L
+                                    + AurenAnalytics.trackPlayCount(this, a.id) * 9000L
+                                    + AurenAnalytics.trackTime(this, a.id) / 1000L
+                                    + (AurenAnalytics.isAutoFavorite(this, a.id) ? 12000L : 0L);
 
                     long scoreB =
-                            AurenAnalytics.hourScore(
-                                    this,
-                                    b.id,
-                                    hour) * 140000L
-                                    + AurenAnalytics.trackPlayCount(
-                                            this,
-                                            b.id) * 9000L
-                                    + AurenAnalytics.trackTime(
-                                            this,
-                                            b.id) / 1000L;
+                            AurenAnalytics.hourScore(this, b.id, hour) * 140000L
+                                    + AurenAnalytics.trackPlayCount(this, b.id) * 9000L
+                                    + AurenAnalytics.trackTime(this, b.id) / 1000L
+                                    + (AurenAnalytics.isAutoFavorite(this, b.id) ? 12000L : 0L);
 
                     return Long.compare(
                             scoreB,
@@ -2464,6 +2505,8 @@ public class MainActivity extends ComponentActivity {
     }
     private void showMiniPlayerMenu(View anchor) {
         PopupMenu popup = new PopupMenu(this, anchor);
+        popup.getMenu().add("Fila inteligente");
+        popup.getMenu().add("Estatísticas");
         popup.getMenu().add("Fila de reprodução");
         popup.getMenu().add("Temporizador de sono");
         popup.getMenu().add("Repetição");
