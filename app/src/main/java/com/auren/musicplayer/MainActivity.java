@@ -127,7 +127,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void connectPlaybackController() {
-        SessionToken token = new SessionToken(this, PlaybackService.class);
+        SessionToken token = new SessionToken(this, new ComponentName(this, PlaybackService.class));
         controllerFuture = new MediaController.Builder(this, token).buildAsync();
         controllerFuture.addListener(() -> {
             try {
@@ -664,7 +664,7 @@ public class MainActivity extends ComponentActivity {
         }
         LinearLayout list = column();
         list.setPadding(dp(18), dp(10), dp(18), dp(18));
-        TextView resultadoTitle = text(matches.size() + " resultado" + (matches.size() == 1 ? "" : "s"), 13, R.color.auren_primary);
+        TextView resultTitle = text(matches.size() + " resultado" + (matches.size() == 1 ? "" : "s"), 13, R.color.auren_primary);
         resultadoTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         list.addView(resultTitle, margins(0, 4, 0, 8));
         for (Track track : matches) list.addView(trackRow(track, 0));
@@ -1427,7 +1427,7 @@ public class MainActivity extends ComponentActivity {
                 } else {
                     resultado = safeTitle(a).compareToIgnoreCase(safeTitle(b));
                 }
-                if (result != 0) return resultado;
+                if (resultado != 0) return resultado;
                 return safeTitle(a).compareToIgnoreCase(safeTitle(b));
             }
         });
@@ -1507,8 +1507,8 @@ public class MainActivity extends ComponentActivity {
 
         if (number > 0) {
             TextView plays = text(playCounts.getOrDefault(track.id, 0) + " reproduções", 10, R.color.text_secondary);
-            reproduções.setGravity(Gravity.CENTER);
-            row.addView(reproduções, new LinearLayout.LayoutParams(dp(72), dp(48)));
+            plays.setGravity(Gravity.CENTER);
+            row.addView(plays, new LinearLayout.LayoutParams(dp(72), dp(48)));
         }
 
         ImageButton overflow = iconButton(android.R.drawable.ic_menu_more, "Mais opções");
@@ -1600,8 +1600,8 @@ public class MainActivity extends ComponentActivity {
         List<Track> resultado = new ArrayList<>();
         for (Track track : tracks) {
             if (currentTrack != null && track.id == currentTrack.id) continue;
-            if (!result.contains(track)) resultado.add(track);
-            if (result.size() >= 8) break;
+            if (!resultado.contains(track)) resultado.add(track);
+            if (resultado.size() >= 8) break;
         }
         return resultado;
     }
