@@ -522,8 +522,7 @@ public class MainActivity extends ComponentActivity {
         String[] ids = {"today", "week", "month", "all"};
         for (int i = 0; i < labels.length; i++) {
             final String target = ids[i];
-            TextView tab = chip(labels[i], target.equals(range));
-            tab.setOnClickListener(v -> showAnalyticsDashboard(target));
+            View tab = chip(labels[i], target.equals(range), v -> showAnalyticsDashboard(target));
             tabs.addView(tab, new LinearLayout.LayoutParams(0, dp(42), 1));
         }
         content.addView(tabs, margins(0, 0, 0, 14));
