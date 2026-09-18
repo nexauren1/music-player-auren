@@ -244,7 +244,7 @@ public class BluetoothActivity extends ComponentActivity {
         String name = safeName(device);
         new AlertDialog.Builder(this)
                 .setTitle("Confirmar dispositivo")
-                .setMessage("Ligar ao dispositivo "" + name + ""?")
+                .setMessage("Ligar ao dispositivo \"" + name + "\"?")
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Continuar", (d,w) -> {
                     status.setText("Abrindo ligação para " + name + "…");
