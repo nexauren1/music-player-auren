@@ -5,6 +5,7 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.content.res.ColorStateList;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -52,10 +53,20 @@ public class EqualizerActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(18), dp(18), dp(18), dp(30));
 
+        LinearLayout hero = rounded(ThemeManager.resolve(this, R.color.accent_soft), 22);
+        hero.setPadding(dp(16), dp(14), dp(16), dp(14));
+        TextView heroTitle = text("Som sob o seu controlo", 17, ThemeManager.resolve(this, R.color.text_primary));
+        heroTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        hero.addView(heroTitle);
         TextView intro = text(
-                "Escolha um preset ou ajuste cada banda. As alterações ficam guardadas e voltam quando o áudio é iniciado.",
-                13, ThemeManager.resolve(this, R.color.text_secondary));
-        content.addView(intro, margins(0, 0, 0, 14));
+                "Use um preset ou ajuste cada banda. As definições ficam guardadas para a próxima reprodução.",
+                12, ThemeManager.resolve(this, R.color.text_secondary));
+        hero.addView(intro, margins(0, 4, 0, 0));
+        content.addView(hero, margins(0, 0, 0, 14));
+
+        TextView presetLabel = text("PRESETS", 10, ThemeManager.accent(this));
+        presetLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(presetLabel, margins(2, 0, 0, 7));
 
         LinearLayout presets = row();
         presets.setGravity(Gravity.CENTER_VERTICAL);
@@ -66,14 +77,23 @@ public class EqualizerActivity extends ComponentActivity {
             b.setText(names[i]);
             b.setTextSize(11);
             b.setAllCaps(false);
+            b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
             b.setTextColor(ThemeManager.resolve(this, R.color.text_primary));
+            b.setBackgroundTintList(ColorStateList.valueOf(ThemeManager.card(this)));
             b.setOnClickListener(v -> {
                 AudioEffectsManager.applyPreset(this, preset);
                 rebuildBands();
+                Toast.makeText(this, "Preset aplicado: " + names[preset], Toast.LENGTH_SHORT).show();
             });
-            presets.addView(b, new LinearLayout.LayoutParams(0, dp(48), 1));
+            presets.addView(b, new LinearLayout.LayoutParams(dp(118), dp(48)));
         }
         content.addView(horizontalScroll(presets), margins(0, 0, 0, 18));
+
+        TextView bandsLabel = text(
+                "BANDAS • " + AudioEffectsManager.getNumberOfBands(),
+                10, ThemeManager.accent(this));
+        bandsLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(bandsLabel, margins(2, 0, 0, 8));
 
         bandContainer = column();
         content.addView(bandContainer);
@@ -107,26 +127,43 @@ public class EqualizerActivity extends ComponentActivity {
             line.setPadding(dp(12), dp(8), dp(12), dp(8));
             line.setBackground(roundDrawable(ThemeManager.card(this), 18));
 
-            TextView label = text(frequency, 12, ThemeManager.resolve(this, R.color.text_secondary));
+            LinearLayout frequencyBox = column();
+            TextView label = text(frequency, 12, ThemeManager.resolve(this, R.color.text_primary));
+            label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
             label.setGravity(Gravity.CENTER);
-            line.addView(label, new LinearLayout.LayoutParams(dp(58), dp(44)));
+            frequencyBox.addView(label, new LinearLayout.LayoutParams(dp(62), dp(28)));
+
+            TextView value = text(formatLevel(AudioEffectsManager.getLevel(this, i)), 10, ThemeManager.accent(this));
+            value.setGravity(Gravity.CENTER);
+            frequencyBox.addView(value);
+            line.addView(frequencyBox, new LinearLayout.LayoutParams(dp(62), dp(50)));
 
             SeekBar seek = new SeekBar(this);
             seek.setMax(AudioEffectsManager.getMaxLevel() - AudioEffectsManager.getMinLevel());
             seek.setProgress(AudioEffectsManager.getLevel(this, i) - AudioEffectsManager.getMinLevel());
             seek.setContentDescription("Banda " + frequency);
+            seek.setProgressTintList(ColorStateList.valueOf(ThemeManager.accent(this)));
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                seek.setThumbTintList(ColorStateList.valueOf(ThemeManager.accent(this)));
+            }
             seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
+                    int level = AudioEffectsManager.getMinLevel() + progress;
+                    value.setText(formatLevel(level));
                     if (fromUser) AudioEffectsManager.setLevel(
-                            EqualizerActivity.this, band,
-                            AudioEffectsManager.getMinLevel() + progress);
+                            EqualizerActivity.this, band, level);
                 }
                 @Override public void onStartTrackingTouch(SeekBar s) {}
                 @Override public void onStopTrackingTouch(SeekBar s) {}
             });
-            line.addView(seek, new LinearLayout.LayoutParams(0, dp(52), 1));
+            line.addView(seek, new LinearLayout.LayoutParams(0, dp(50), 1));
             bandContainer.addView(line, margins(0, 0, 0, 8));
         }
+    }
+
+    private String formatLevel(int milliBel) {
+        float db = milliBel / 100f;
+        return String.format(java.util.Locale.US, "%+.1f dB", db);
     }
 
     private String formatFrequency(int hz) {
