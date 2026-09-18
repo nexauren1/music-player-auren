@@ -133,8 +133,7 @@ public final class UpdateManager {
 
         int total = connection.getContentLength();
         int done = 0;
-        File cache = activity.getExternalCacheDir();
-        if (cache == null) cache = activity.getCacheDir();
+        File cache = activity.getCacheDir();
         File out = new File(cache, "auren-update.apk");
         if (out.exists() && !out.delete()) {
             throw new IllegalStateException("Could not replace cached APK");
@@ -201,27 +200,26 @@ public final class UpdateManager {
         // Give Android both the MIME type and a readable ClipData item.
         // This avoids OEM package installers silently opening/closing the app
         // without showing the update confirmation screen.
-        Intent installer = new Intent(Intent.ACTION_VIEW);
+        Intent installer = new Intent(Intent.ACTION_INSTALL_PACKAGE);
         installer.setDataAndType(uri, APK_TYPE);
-        installer.setClipData(ClipData.newRawUri("AurenUpdate", uri));
+        installer.setClipData(ClipData.newRawUri("NexaurenUpdate", uri));
+        installer.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
         installer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        installer.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        installer.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 
         try {
             activity.startActivity(installer);
             status.setText("Instalador do Android aberto. Toque em Atualizar para concluir.");
         } catch (Exception firstError) {
-            Intent fallback = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+            Intent fallback = new Intent(Intent.ACTION_VIEW);
             fallback.setDataAndType(uri, APK_TYPE);
-            fallback.setClipData(ClipData.newRawUri("AurenUpdate", uri));
-            fallback.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
+            fallback.setClipData(ClipData.newRawUri("NexaurenUpdate", uri));
             fallback.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             try {
                 activity.startActivity(fallback);
                 status.setText("Instalador do Android aberto. Toque em Atualizar para concluir.");
             } catch (Exception secondError) {
-                status.setText("Não foi possível abrir o instalador do Android. Verifique as permissões de instalação.");
+                status.setText("Não foi possível abrir o instalador do Android. Verifique a permissão de instalar aplicações.");
                 finish(callback);
             }
         }
