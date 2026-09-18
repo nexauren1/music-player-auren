@@ -167,6 +167,22 @@ public class MainActivity extends ComponentActivity {
         super.onStop();
     }
 
+    private void persistResumePosition() {
+        if (player == null || currentTrack == null) return;
+
+        SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
+        if (player.getPlaybackState() == Player.STATE_ENDED) {
+            prefs.edit().remove("resume_id").remove("resume_position").apply();
+            return;
+        }
+
+        long position = Math.max(0L, player.getCurrentPosition());
+        prefs.edit()
+                .putLong("resume_id", currentTrack.id)
+                .putLong("resume_position", position)
+                .commit();
+    }
+
     private String themeKey() {
         return ThemeManager.hex(ThemeManager.accent(this)) + ":" + ThemeManager.isDark(this);
     }
@@ -709,7 +725,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout list = column();
         list.setPadding(dp(18), dp(10), dp(18), dp(18));
         TextView resultTitle = text(matches.size() + " resultado" + (matches.size() == 1 ? "" : "s"), 13, R.color.auren_primary);
-        resultadoTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        resultTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         list.addView(resultTitle, margins(0, 4, 0, 8));
         for (Track track : matches) list.addView(trackRow(track, 0));
         ScrollView scroll = new ScrollView(this);
@@ -2013,13 +2029,17 @@ public class MainActivity extends ComponentActivity {
         return view;
     }
 
-    private LinearLayout rounded(int color, int radius) {
-        LinearLayout view = new LinearLayout(this);
-        view.setOrientation(LinearLayout.HORIZONTAL);
+    private GradientDrawable roundDrawable(int color, int radius) {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(color);
         bg.setCornerRadius(dp(radius));
-        view.setBackground(bg);
+        return bg;
+    }
+
+    private LinearLayout rounded(int color, int radius) {
+        LinearLayout view = new LinearLayout(this);
+        view.setOrientation(LinearLayout.HORIZONTAL);
+        view.setBackground(roundDrawable(color, radius));
         return view;
     }
 
