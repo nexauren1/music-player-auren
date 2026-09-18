@@ -61,18 +61,18 @@ jobs:
             keytool -list -keystore "$AUREN_KEYSTORE_PATH" -storepass "$AUREN_STORE_PASS" >/dev/null
 
             gradle --no-daemon clean assembleRelease --stacktrace
-            cp app/build/outputs/apk/release/app-release.apk Auren-Music-Player.apk
+            cp app/build/outputs/apk/release/app-release.apk Nexauren-Music-Player.apk
             echo "mode=signed" >> "$GITHUB_OUTPUT"
           else
             echo "signed=false" >> "$GITHUB_OUTPUT"
 
             gradle --no-daemon clean assembleDebug --stacktrace
-            cp app/build/outputs/apk/debug/app-debug.apk Auren-Music-Player.apk
+            cp app/build/outputs/apk/debug/app-debug.apk Nexauren-Music-Player.apk
             echo "mode=debug-signed" >> "$GITHUB_OUTPUT"
           fi
 
-          test -s Auren-Music-Player.apk
-          sha256sum Auren-Music-Player.apk > Auren-Music-Player.apk.sha256
+          test -s Nexauren-Music-Player.apk
+          sha256sum Nexauren-Music-Player.apk > Nexauren-Music-Player.apk.sha256
 
       - name: Read version
         id: version
@@ -85,10 +85,10 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Auren-Music-Player-v${{ steps.version.outputs.version }}
+          name: Nexauren-Music-Player-v${{ steps.version.outputs.version }}
           path: |
-            Auren-Music-Player.apk
-            Auren-Music-Player.apk.sha256
+            Nexauren-Music-Player.apk
+            Nexauren-Music-Player.apk.sha256
 
       - name: Publish GitHub Release
         env:
@@ -110,4 +110,4 @@ jobs:
             NOTE="Debug-signed APK for free direct distribution/testing. A persistent release keystore can be added later for seamless updates."
           fi
 
-          gh release create "${TAG}"             Auren-Music-Player.apk             Auren-Music-Player.apk.sha256             --title "Auren Music Player ${TAG}"             --notes "${NOTE}"
+          gh release create "${TAG}"             Nexauren-Music-Player.apk             Nexauren-Music-Player.apk.sha256             --title "Nexauren Music Player ${TAG}"             --notes "${NOTE}"
