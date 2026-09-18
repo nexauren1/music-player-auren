@@ -51,7 +51,7 @@ public final class PlaybackService extends MediaSessionService {
             mediaSession = null;
         }
         AudioEffectsManager.release();
-        if (player != null)
+        if (player != null) {
             player.release();
             player = null;
         }
