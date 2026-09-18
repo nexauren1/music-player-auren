@@ -1064,7 +1064,7 @@ public class MainActivity extends ComponentActivity {
         TextView brand = text("NEXAUREN", 25, android.R.color.white);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         header.addView(brand);
-        TextView subtitle = text("Music Player", 13, android.R.color.white);
+        TextView subtitle = text("Music Player - Nexauren", 13, android.R.color.white);
         header.addView(subtitle, margins(0, 2, 0, 0));
         TextView version = text("Versão " + BuildConfig.VERSION_NAME, 11, android.R.color.white);
         header.addView(version, margins(0, 12, 0, 0));
@@ -2315,7 +2315,7 @@ public class MainActivity extends ComponentActivity {
         return card;
     }
     private View trackRow(Track track, int number) {
-        LinearLayout row = rounded(Color.WHITE, 16);
+        LinearLayout row = rounded(ThemeManager.card(this), 16);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(7), dp(4), dp(7));
         row.setTag(track.id);
@@ -2610,7 +2610,7 @@ public class MainActivity extends ComponentActivity {
         List<Track> items = getPlaylistTracks(name);
         long total = playlistDuration(items);
 
-        LinearLayout card = rounded(Color.WHITE, 18);
+        LinearLayout card = rounded(ThemeManager.card(this), 18);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(8), dp(8), dp(8), dp(8));
         card.setElevation(dp(2));
