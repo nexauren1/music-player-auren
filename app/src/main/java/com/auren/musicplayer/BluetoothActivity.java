@@ -83,7 +83,7 @@ public class BluetoothActivity extends ComponentActivity {
         TextView title = text("Bluetooth", 20, R.color.text_primary);
         title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         titles.addView(title);
-        titles.addView(text("Ligue a sua música a um dispositivo", 11, R.color.text_secondary), margins(0,2,0,0));
+        titles.addView(text("Gerencie a ligação Bluetooth pelo Android", 11, R.color.text_secondary), margins(0,2,0,0));
         bar.addView(titles, new LinearLayout.LayoutParams(0, dp(52), 1));
         root.addView(bar);
 
@@ -96,7 +96,7 @@ public class BluetoothActivity extends ComponentActivity {
         TextView heroTitle = text("Conectar dispositivo", 18, R.color.text_primary);
         heroTitle.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         hero.addView(heroTitle);
-        hero.addView(text("O Nexauren procura dispositivos próximos. Quando encontrar o nome certo, confirme e o Android abre a ligação Bluetooth.", 12, R.color.text_secondary),
+        hero.addView(text("O Nexauren procura dispositivos próximos. Escolha um dispositivo emparelhado ou encontrado e abra as definições do Android para concluir a ligação.", 12, R.color.text_secondary),
                 margins(0,4,0,10));
         Button scanButton = button("Pesquisar dispositivos");
         scanButton.setOnClickListener(v -> scan());
@@ -233,7 +233,7 @@ public class BluetoothActivity extends ComponentActivity {
             info.addView(title);
             info.addView(text(state, 11, R.color.text_secondary), margins(0,2,0,0));
             card.addView(info, new LinearLayout.LayoutParams(0, dp(56), 1));
-            Button connect = button("Escolher");
+            Button connect = button("Abrir definições");
             connect.setOnClickListener(v -> confirmDevice(device));
             card.addView(connect, new LinearLayout.LayoutParams(dp(104), dp(50)));
             deviceList.addView(card, margins(0,0,0,8));
