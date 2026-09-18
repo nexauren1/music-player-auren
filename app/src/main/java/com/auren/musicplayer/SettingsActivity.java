@@ -182,9 +182,20 @@ public class SettingsActivity extends ComponentActivity {
                 .setMessage("Isto remove contagens de reprodução e o histórico de recentes. Favoritos e playlists não serão removidos.")
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Limpar", (d, w) -> {
-                    getSharedPreferences("auren_player", MODE_PRIVATE).edit().clear().apply();
-                    ThemeManager.setAccent(this, Color.rgb(91, 82, 227));
-                    ThemeManager.setDark(this, false);
+                    android.content.SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
+                    android.content.SharedPreferences.Editor editor = prefs.edit();
+                    java.util.Set<String> keys = prefs.getAll().keySet();
+                    for (String key : keys) {
+                        if (key.startsWith("play_count_") || key.startsWith("eq_band_")
+                                || key.equals("play_counts_v2")
+                                || key.equals("recent_tracks")
+                                || key.equals("last_played_id")
+                                || key.equals("last_played_at")
+                                || key.equals("stats_schema")) {
+                            editor.remove(key);
+                        }
+                    }
+                    editor.apply();
                     recreate();
                 })
                 .show();
