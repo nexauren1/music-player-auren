@@ -183,7 +183,8 @@ public class MainActivity extends ComponentActivity {
 
         SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
         if (player.getPlaybackState() == Player.STATE_ENDED) {
-            prefs.edit().remove("resume_id").remove("resume_position").remove("resume_playing").apply();
+            prefs.edit().remove("resume_id").remove("resume_position").remove("resume_playing")
+                    .remove("track_position_" + currentTrack.id).apply();
             return;
         }
 
@@ -191,6 +192,7 @@ public class MainActivity extends ComponentActivity {
         prefs.edit()
                 .putLong("resume_id", currentTrack.id)
                 .putLong("resume_position", position)
+                .putLong("track_position_" + currentTrack.id, position)
                 .putBoolean("resume_playing", player.isPlaying())
                 .commit();
     }
@@ -539,12 +541,12 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout stats2 = row();
         AchievementManager.Stats a = AchievementManager.stats(this);
-        stats2.addView(statCard("SEQUÊNCIA", a.streakCurrentLabel(), "Auren Journey"), new LinearLayout.LayoutParams(0, dp(92), 1));
+        stats2.addView(statCard("SEQUÊNCIA", AurenAnalytics.summary(this).streakCurrent + " dia(s)", "Auren Journey"), new LinearLayout.LayoutParams(0, dp(92), 1));
         stats2.addView(statCard("MÚSICAS", String.valueOf(a.uniqueTracks), "diferentes"), margins(8, 0, 0, 0));
         content.addView(stats2, margins(0, 8, 0, 14));
 
         content.addView(featureSectionTitle("Top 5 músicas por tempo ouvido"));
-        List<AurenAnalytics.TrackScore> topTracks = AurenAnalytics.topTracks(this, analyticsTracks(), 5);
+        List<AurenAnalytics.TrackScore> topTracks = AurenAnalytics.topTracks(this, analyticsTracks(), range, 5);
         if (topTracks.isEmpty()) content.addView(emptyCard("Ainda não há tempo suficiente para um ranking."));
         for (AurenAnalytics.TrackScore t : topTracks) content.addView(trackAnalyticsRow(t));
 
@@ -911,10 +913,6 @@ public class MainActivity extends ComponentActivity {
         return card;
     }
 
-    private View artworkAccentPlaceholder() {
-        return null;
-    }
-
     private void showRecent() {
         setActiveTab(libraryTab);
         pageContainer.removeAllViews();
@@ -1276,7 +1274,7 @@ public class MainActivity extends ComponentActivity {
         miniPlay = iconButton(android.R.drawable.ic_media_play, "Reproduzir ou pausar");
         miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                 ThemeManager.resolve(this, R.color.auren_primary)));
-        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
+        DrawableCompat.setTint(miniPlay.getDrawable(), ThemeManager.textOnAccent(this));
         miniPlay.setPadding(dp(11), dp(11), dp(11), dp(11));
         miniPlay.setOnClickListener(v -> togglePlayback());
         row.addView(miniPlay, new LinearLayout.LayoutParams(dp(50), dp(50)));
@@ -1449,7 +1447,7 @@ public class MainActivity extends ComponentActivity {
                 "Reproduzir ou pausar");
         playPause.setBackgroundTintList(
                 android.content.res.ColorStateList.valueOf(ThemeManager.resolve(this, R.color.auren_primary)));
-        DrawableCompat.setTint(playPause.getDrawable(), Color.WHITE);
+        DrawableCompat.setTint(playPause.getDrawable(), ThemeManager.textOnAccent(this));
         playPause.setPadding(dp(18), dp(18), dp(18), dp(18));
         playPause.setOnClickListener(v -> {
             togglePlayback();
@@ -1807,7 +1805,10 @@ public class MainActivity extends ComponentActivity {
 
         long resumePosition = 0L;
         android.content.SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
-        if (restoringTrack && prefs.getLong("resume_id", -1L) == track.id) {
+        long savedPerTrack = prefs.getLong("track_position_" + track.id, 0L);
+        if (savedPerTrack > 0L) {
+            resumePosition = savedPerTrack;
+        } else if (restoringTrack && prefs.getLong("resume_id", -1L) == track.id) {
             resumePosition = Math.max(0L, prefs.getLong("resume_position", 0L));
         }
         item = item.buildUpon().setMediaId(String.valueOf(track.id)).build();
@@ -2701,9 +2702,9 @@ public class MainActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(22));
 
-        TextView eyebrow = text("SEU PROGRESSO", 11, R.color.auren_primary);
+        TextView eyebrow = text("AUREN JOURNEY", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView title = text("Conquistas & Recordes", 28, R.color.text_primary);
+        TextView title = text("Auren Journey", 28, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         content.addView(eyebrow);
         content.addView(title, margins(0, 3, 0, 8));
@@ -2721,6 +2722,14 @@ public class MainActivity extends ComponentActivity {
         records.addView(statCard("Recorde semanal", String.valueOf(stats.bestWeek), "melhor semana"), margins(8, 0, 0, 0));
         records.addView(statCard("Recorde mensal", String.valueOf(stats.bestMonth), "melhor mês"), margins(8, 0, 0, 0));
         content.addView(records, margins(0, 8, 0, 0));
+
+        AurenAnalytics.Summary journey = AurenAnalytics.summary(this);
+        LinearLayout journeyMetrics = row();
+        journeyMetrics.addView(statCard("TEMPO HOJE", AurenAnalytics.formatDuration(journey.todayMs), "minutos ouvidos"),
+                new LinearLayout.LayoutParams(0, dp(92), 1));
+        journeyMetrics.addView(statCard("SEQUÊNCIA", journey.streakCurrent + " dia(s)", "dias seguidos"),
+                margins(8, 0, 0, 0));
+        content.addView(journeyMetrics, margins(0, 8, 0, 0));
 
         content.addView(text(
                 stats.totalPlays + " reproduções • " + stats.uniqueTracks + " músicas diferentes • "
@@ -2782,6 +2791,12 @@ public class MainActivity extends ComponentActivity {
         goal.setGravity(Gravity.CENTER);
         goal.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         card.addView(goal, new LinearLayout.LayoutParams(dp(76), dp(54)));
+        if (badge.unlocked) {
+            card.setAlpha(0f);
+            card.setScaleX(0.97f);
+            card.setScaleY(0.97f);
+            card.post(() -> card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(220).start());
+        }
         return card;
     }
 
