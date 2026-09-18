@@ -1,5 +1,7 @@
 name: Android Release
 
+# Nexauren release workflow
+
 on:
   push:
     branches:
