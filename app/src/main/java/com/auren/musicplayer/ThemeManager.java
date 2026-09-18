@@ -62,7 +62,9 @@ public final class ThemeManager {
     }
 
     public static int surface(Context context) {
-        return isDark(context) ? Color.rgb(15, 18, 23) : Color.rgb(246, 248, 252);
+        return isDark(context)
+                ? blend(accent(context), Color.rgb(15, 18, 23), 0.04f)
+                : blend(accent(context), Color.rgb(246, 248, 252), 0.02f);
     }
 
     public static int card(Context context) {
