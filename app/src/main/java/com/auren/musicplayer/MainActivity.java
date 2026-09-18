@@ -161,6 +161,11 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
+    @Override protected void onStop() {
+        persistResumePosition();
+        super.onStop();
+    }
+
     private String themeKey() {
         return ThemeManager.hex(ThemeManager.accent(this)) + ":" + ThemeManager.isDark(this);
     }
@@ -1130,6 +1135,13 @@ public class MainActivity extends ComponentActivity {
         }
 
         recentTracks.clear();
+        long lastPlayedId = prefs.getLong("last_played_id", -1L);
+        for (Track track : tracks) {
+            if (track.id == lastPlayedId) {
+                currentTrack = track;
+                break;
+            }
+        }
         String recent = prefs.getString("recent_tracks", "");
         if (recent == null || recent.trim().isEmpty()) return;
         for (String value : recent.split(",")) {
@@ -1180,6 +1192,8 @@ public class MainActivity extends ComponentActivity {
         boolean newPlayEvent = currentTrack == null
                 || currentTrack.id != track.id
                 || player.getPlaybackState() == Player.STATE_ENDED;
+        boolean restoringTrack = !newPlayEvent
+                && player.getMediaItemCount() == 0;
         currentTrack = track;
         if (newPlayEvent) {
             playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
@@ -1200,10 +1214,21 @@ public class MainActivity extends ComponentActivity {
                         .build())
                 .build();
 
-        player.setMediaItem(item);
+        long resumePosition = 0L;
+        android.content.SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
+        if (restoringTrack && prefs.getLong("resume_id", -1L) == track.id) {
+            resumePosition = Math.max(0L, prefs.getLong("resume_position", 0L));
+        }
+        item = item.buildUpon().setMediaId(String.valueOf(track.id)).build();
+        if (resumePosition > 0L) {
+            player.setMediaItem(item, resumePosition);
+        } else {
+            player.setMediaItem(item);
+        }
         player.prepare();
         requestNotificationPermissionIfNeeded();
         player.play();
+        prefs.edit().remove("resume_position").remove("resume_id").apply();
         updateMiniPlayer();
         highlightPlayingTrack();
     }
