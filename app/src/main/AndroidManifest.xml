@@ -17,7 +17,7 @@
         android:allowBackup="true"
         android:icon="@drawable/auren_icon"
         android:roundIcon="@drawable/auren_icon"
-        android:label="Music Player - Nexauren"
+        android:label="Nexauren Music Player"
         android:supportsRtl="true"
         android:theme="@style/Theme.AurenMusic">
 
