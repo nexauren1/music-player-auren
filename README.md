@@ -13,22 +13,35 @@ Auren Music Player é um reprodutor de música Android focado em uma experiênci
 - Temporizador de sono e repetição A-B.
 - Interface clara e responsiva, com navegação inferior e player dedicado.
 
+## Distribuição
+
+**Neste momento, o Auren não depende da Google Play.**
+
+As versões podem ser distribuídas gratuitamente através do GitHub Releases. Cada release publica o APK e o respetivo SHA-256 para verificação. O GitHub permite disponibilizar ficheiros binários como assets das releases e partilhar uma URL estável para a release mais recente. citeturn881013search5turn881013search3
+
+A Google Play fica como uma etapa futura, quando houver condições para criar a conta de desenvolvedor. A inscrição do Play Console atualmente custa US$ 25 uma única vez. citeturn881013search6
+
 ## Arquitetura
 
 A Activity é responsável pela interface. O áudio é mantido no `PlaybackService`, que possui o `ExoPlayer` e a `MediaSession`. A Activity comunica-se com esse motor através de `MediaController`.
 
-Não existe instalador APK automático no aplicativo. As versões oficiais devem ser distribuídas pelo Google Play.
+Não existe instalador APK automático dentro do aplicativo.
 
 ## Build
 
-O projeto usa Android Gradle Plugin 8.13.0, Gradle 8.13 e Java 17.
+O projeto usa Android Gradle Plugin 8.13.0, Gradle 8.13, Java 17 e API 36.
 
-O release é preparado para Android 16 / API 36 e gera:
+O workflow de release:
 
-- Android App Bundle (AAB) para Google Play.
-- APK assinado para testes/distribuição direta.
+1. Compila um APK assinado com a chave de release quando os secrets de assinatura existem.
+2. Caso contrário, compila um APK debug assinado para permitir distribuição e testes sem custo inicial.
+3. Publica o APK e o SHA-256 como GitHub Release.
 
-Os builds são realizados no GitHub Actions. O release oficial é acionado por uma tag `v*`.
+O projeto não precisa pagar a Google Play para continuar a ser desenvolvido, testado e distribuído desta forma.
+
+## Desenvolvimento
+
+O GitHub Actions também executa compilação e lint em separado antes da preparação de uma release.
 
 ## Identidade
 
