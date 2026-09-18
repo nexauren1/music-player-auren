@@ -94,6 +94,7 @@ public final class AchievementManager {
         result.add(new Badge("artists", "10 artistas", "Ouça músicas de 10 artistas diferentes.", "10 artistas", AurenAnalytics.uniqueArtists(context) >= 10));
         result.add(new Badge("night", "Sessão noturna", "Tenha uma reprodução entre 20:00 e 05:00.", "1 noite", AurenAnalytics.nightPlays(context) >= 1));
         result.add(new Badge("repeat", "Em loop", "Repita uma música pelo menos cinco vezes.", "5 na mesma", hasRepeatedTrack(context)));
+        result.add(new Badge("album", "Álbum completo", "Ouça todas as faixas de um álbum com pelo menos duas músicas.", "álbum 100%", context.getSharedPreferences("auren_player", Context.MODE_PRIVATE).getBoolean("album_complete", false)));
         result.add(new Badge("daily_record", "Dia de recorde", "Faça pelo menos 20 reproduções num dia.", "20 num dia", bestDay >= 20));
         result.add(new Badge("weekly_record", "Semana de recorde", "Faça pelo menos 50 reproduções numa semana.", "50 na semana", bestWeek >= 50));
         result.add(new Badge("monthly_record", "Mês de recorde", "Faça pelo menos 150 reproduções num mês.", "150 no mês", bestMonth >= 150));
