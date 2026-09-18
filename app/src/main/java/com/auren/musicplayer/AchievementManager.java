@@ -88,10 +88,32 @@ public final class AchievementManager {
         result.add(new Badge("fifty", "Maratonista", "Chegue a 50 reproduções.", "50", total >= 50));
         result.add(new Badge("week", "Semana musical", "Tenha atividade em 7 dias.", "7 dias", days >= 7));
         result.add(new Badge("month", "Centena mensal", "Alcance 100 reproduções no mês atual.", "100 no mês", month >= 100));
+        result.add(new Badge("first_day", "Primeira música do dia", "Comece o dia com uma reprodução.", "1 hoje", prefs.getInt(dayKey(today), 0) >= 1));
+        result.add(new Badge("minutes", "100 minutos hoje", "Ouça pelo menos 100 minutos num único dia.", "100 min hoje", AurenAnalytics.summary(context).todayMs >= 100L * 60_000L));
+        result.add(new Badge("streak", "Sete dias seguidos", "Ouça música em sete dias consecutivos.", "7 dias", AurenAnalytics.summary(context).streakBest >= 7));
+        result.add(new Badge("artists", "10 artistas", "Ouça músicas de 10 artistas diferentes.", "10 artistas", AurenAnalytics.uniqueArtists(context) >= 10));
+        result.add(new Badge("night", "Sessão noturna", "Tenha uma reprodução entre 20:00 e 05:00.", "1 noite", AurenAnalytics.nightPlays(context) >= 1));
+        result.add(new Badge("repeat", "Em loop", "Repita uma música pelo menos cinco vezes.", "5 na mesma", hasRepeatedTrack(context)));
         result.add(new Badge("daily_record", "Dia de recorde", "Faça pelo menos 20 reproduções num dia.", "20 num dia", bestDay >= 20));
         result.add(new Badge("weekly_record", "Semana de recorde", "Faça pelo menos 50 reproduções numa semana.", "50 na semana", bestWeek >= 50));
         result.add(new Badge("monthly_record", "Mês de recorde", "Faça pelo menos 150 reproduções num mês.", "150 no mês", bestMonth >= 150));
         return result;
+    }
+
+    private static boolean hasRepeatedTrack(Context context) {
+        SharedPreferences p = context.getSharedPreferences("auren_player", Context.MODE_PRIVATE);
+        String raw = p.getString("play_counts_v2", "");
+        if (raw != null) {
+            for (String entry : raw.split(";")) {
+                String[] pair = entry.split("=", 2);
+                if (pair.length == 2) {
+                    try {
+                        if (Integer.parseInt(pair[1]) >= 5) return true;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+        return false;
     }
 
     private static String dayKey(LocalDate date) { return "day_" + date; }
