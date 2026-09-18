@@ -3,6 +3,7 @@ package com.auren.musicplayer;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.ComponentName;
 import android.content.ContentUris;
 import android.content.Intent;
 import android.content.pm.PackageManager;
