@@ -436,8 +436,7 @@ public final class UpdateManager {
 
             status.setText(
                     "Instalador do Android aberto. Confirme em 'Instalar'.");
-            // Keep the file until the user returns; this also allows recovery
-            // if Android sends the user to the unknown-app-source settings.
+            clearPending(activity);
             finish(callback);
             return;
         } catch (ActivityNotFoundException ignored) {
