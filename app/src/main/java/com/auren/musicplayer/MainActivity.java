@@ -93,6 +93,7 @@ public class MainActivity extends ComponentActivity {
     };
     private Track currentTrack;
     private ImageButton miniPlay;
+    private ImageButton miniFavorite;
     private ImageView miniArt;
     private TextView miniTitle;
     private TextView miniArtist;
@@ -331,6 +332,12 @@ public class MainActivity extends ComponentActivity {
             }
         }
 
+        AchievementManager.Stats homeStats = AchievementManager.stats(this);
+        addSectionHeader(content, "Conquistas & recordes",
+                homeStats.unlocked + "/" + homeStats.totalAchievements + " desbloqueadas",
+                v -> showAchievements());
+        content.addView(homeAchievementCard(), margins(0, 0, 0, 2));
+
         // AUREN_ALL_SONGS_HOME_START
         addSectionHeader(content, "Todas as músicas", tracks.size() + " músicas", v -> showLibrary());
         if (tracks.isEmpty()) {
@@ -509,7 +516,7 @@ public class MainActivity extends ComponentActivity {
         content.addView(eyebrow);
         content.addView(title, margins(0, 3, 0, 0));
 
-        LinearLayout create = rounded(0xFFEEECFF, 20);
+        LinearLayout create = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
         create.setGravity(Gravity.CENTER_VERTICAL);
         TextView plus = text("+", 28, R.color.auren_primary);
         plus.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -621,6 +628,7 @@ public class MainActivity extends ComponentActivity {
         addDrawerItem(items, "↗", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
         addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
         addDrawerItem(items, "✦", "Sugestões", () -> { dialog.dismiss(); showSuggestions(); });
+        addDrawerItem(items, "★", "Conquistas & recordes", () -> { dialog.dismiss(); showAchievements(); });
 
         addDrawerSection(items, "FERRAMENTAS");
         addDrawerItem(items, "≋", "Equalizador", () -> {
@@ -742,56 +750,73 @@ public class MainActivity extends ComponentActivity {
     }
     private LinearLayout buildMiniPlayer() {
         LinearLayout mini = column();
-        mini.setBackgroundColor(Color.WHITE);
+        mini.setBackground(roundDrawable(ThemeManager.card(this), 18));
         mini.setElevation(dp(10));
+        mini.setPadding(0, 0, 0, dp(1));
 
         View progress = new View(this);
         progress.setBackgroundColor(ThemeManager.resolve(this, R.color.auren_primary));
-        mini.addView(progress, new LinearLayout.LayoutParams(-1, dp(2)));
+        mini.addView(progress, new LinearLayout.LayoutParams(-1, dp(3)));
 
         LinearLayout row = row();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(10), dp(6), dp(8), dp(6));
+        row.setPadding(dp(8), dp(5), dp(6), dp(5));
 
-        miniArt = artwork(52);
+        miniArt = artwork(50);
         miniArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        row.addView(miniArt, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        row.addView(miniArt, new LinearLayout.LayoutParams(dp(50), dp(50)));
 
         LinearLayout info = column();
         info.setGravity(Gravity.CENTER_VERTICAL);
-        info.setPadding(dp(12), 0, dp(8), 0);
+        info.setPadding(dp(10), 0, dp(5), 0);
 
-        miniTitle = text("Nada a tocar", 14, R.color.text_primary);
+        miniTitle = text("Nada a tocar", 13, R.color.text_primary);
         miniTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         miniTitle.setSingleLine(true);
         miniTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
 
-        miniArtist = text("Escolha uma música para começar", 12, R.color.text_secondary);
+        miniArtist = text("Escolha uma música para começar", 11, R.color.text_secondary);
         miniArtist.setSingleLine(true);
         miniArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
 
         info.addView(miniTitle);
-        info.addView(miniArtist, margins(0, 2, 0, 0));
-        row.addView(info, new LinearLayout.LayoutParams(0, dp(52), 1));
+        info.addView(miniArtist, margins(0, 1, 0, 0));
+        row.addView(info, new LinearLayout.LayoutParams(0, dp(50), 1));
 
-        ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções e efeitos");
-        functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
-        DrawableCompat.setTint(functions.getDrawable(), ThemeManager.resolve(this, R.color.text_primary));
-        functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
-        row.addView(functions, new LinearLayout.LayoutParams(dp(38), dp(52)));
+        ImageButton previous = iconButton(android.R.drawable.ic_media_previous, "Música anterior");
+        previous.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
+        previous.setOnClickListener(v -> previousTrackInPlayer());
+        row.addView(previous, new LinearLayout.LayoutParams(dp(38), dp(50)));
+
+        miniFavorite = iconButton(android.R.drawable.btn_star_big_off, "Adicionar aos favoritos");
+        miniFavorite.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
+        miniFavorite.setOnClickListener(v -> {
+            if (currentTrack != null) {
+                setFavorite(currentTrack, !isFavorite(currentTrack));
+                updateMiniPlayer();
+                Toast.makeText(this, isFavorite(currentTrack)
+                        ? "Adicionado aos favoritos." : "Removido dos favoritos.", Toast.LENGTH_SHORT).show();
+            }
+        });
+        row.addView(miniFavorite, new LinearLayout.LayoutParams(dp(38), dp(50)));
+
+        miniPlay = iconButton(android.R.drawable.ic_media_play, "Reproduzir ou pausar");
+        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                ThemeManager.resolve(this, R.color.auren_primary)));
+        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
+        miniPlay.setPadding(dp(11), dp(11), dp(11), dp(11));
+        miniPlay.setOnClickListener(v -> togglePlayback());
+        row.addView(miniPlay, new LinearLayout.LayoutParams(dp(50), dp(50)));
 
         ImageButton next = iconButton(android.R.drawable.ic_media_next, "Próxima música");
         next.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
-        DrawableCompat.setTint(next.getDrawable(), ThemeManager.resolve(this, R.color.text_primary));
         next.setOnClickListener(v -> nextTrackInPlayer());
-        row.addView(next, new LinearLayout.LayoutParams(dp(42), dp(52)));
+        row.addView(next, new LinearLayout.LayoutParams(dp(38), dp(50)));
 
-        miniPlay = iconButton(android.R.drawable.ic_media_play, "Reproduzir ou pausar");
-        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ThemeManager.resolve(this, R.color.auren_primary)));
-        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
-        miniPlay.setPadding(dp(12), dp(12), dp(12), dp(12));
-        miniPlay.setOnClickListener(v -> togglePlayback());
-        row.addView(miniPlay, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        ImageButton functions = iconButton(android.R.drawable.ic_menu_more, "Funções do mini player");
+        functions.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
+        functions.setOnClickListener(v -> showMiniPlayerMenu(functions));
+        row.addView(functions, new LinearLayout.LayoutParams(dp(36), dp(50)));
 
         mini.addView(row);
         mini.setOnClickListener(v -> openNowPlaying());
@@ -800,6 +825,7 @@ public class MainActivity extends ComponentActivity {
         miniArtist.setOnClickListener(v -> openNowPlaying());
         return mini;
     }
+
 
 
 
@@ -905,6 +931,12 @@ public class MainActivity extends ComponentActivity {
 
         SeekBar seek = new SeekBar(this);
         seek.setMax(1000);
+        seek.setProgressTintList(android.content.res.ColorStateList.valueOf(
+                ThemeManager.resolve(this, R.color.auren_primary)));
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            seek.setThumbTintList(android.content.res.ColorStateList.valueOf(
+                    ThemeManager.resolve(this, R.color.auren_primary)));
+        }
         seek.setProgress(progressValue());
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
@@ -1227,6 +1259,7 @@ public class MainActivity extends ComponentActivity {
             recentTracks.remove(track);
             recentTracks.add(0, track);
             while (recentTracks.size() > 20) recentTracks.remove(recentTracks.size() - 1);
+            AchievementManager.recordPlay(this, track.id);
         }
         persistListeningState(track);
 
@@ -1286,7 +1319,7 @@ public class MainActivity extends ComponentActivity {
                     View child = group.getChildAt(i);
                     if (child instanceof TextView) {
                         TextView tv = (TextView) child;
-                        tv.setTextColor(getColor(playing ? R.color.playing_text : R.color.text_primary));
+                        tv.setTextColor(ThemeManager.resolve(this, playing ? R.color.playing_text : R.color.text_primary));
                     }
                 }
             }
@@ -1298,7 +1331,6 @@ public class MainActivity extends ComponentActivity {
             }
         }
     }
-
     private void updateMiniPlayer() {
         if (currentTrack == null || miniTitle == null || miniArtist == null || miniArt == null || miniPlay == null) return;
         miniTitle.setText(safeTitle(currentTrack));
@@ -1307,10 +1339,20 @@ public class MainActivity extends ComponentActivity {
         if (miniArt.getDrawable() == null) miniArt.setImageResource(android.R.drawable.ic_media_play);
         boolean playing = player != null && player.isPlaying();
         miniPlay.setImageResource(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
-        if (homeTab != null && pageContainer != null) {
-            // Keep the current page; the mini player must never trap the user.
+        miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                ThemeManager.resolve(this, R.color.auren_primary)));
+        DrawableCompat.setTint(miniPlay.getDrawable(), Color.WHITE);
+        if (miniFavorite != null) {
+            boolean favorite = isFavorite(currentTrack);
+            miniFavorite.setImageResource(favorite
+                    ? android.R.drawable.btn_star_big_on
+                    : android.R.drawable.btn_star_big_off);
+            DrawableCompat.setTint(miniFavorite.getDrawable(),
+                    favorite ? ThemeManager.resolve(this, R.color.auren_primary)
+                            : ThemeManager.resolve(this, R.color.text_primary));
         }
     }
+
 
     private void syncCurrentTrackWithController() {
         if (player == null || player.getMediaItemCount() == 0) return;
@@ -1612,8 +1654,39 @@ public class MainActivity extends ComponentActivity {
     }
 
 
+    private View homeAchievementCard() {
+        AchievementManager.Stats stats = AchievementManager.stats(this);
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView badge = text("★", 25, R.color.auren_primary);
+        badge.setGravity(Gravity.CENTER);
+        card.addView(badge, new LinearLayout.LayoutParams(dp(48), dp(58)));
+
+        LinearLayout info = column();
+        TextView title = text(stats.totalPlays == 0
+                        ? "Comece sua coleção de conquistas"
+                        : "Seu progresso está crescendo",
+                15, R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(title);
+        info.addView(text(
+                stats.today + " hoje • " + stats.week + " esta semana • recorde " + stats.bestDay + " no dia",
+                11, R.color.text_secondary), margins(0, 3, 0, 0));
+        info.addView(text(stats.unlocked + " de " + stats.totalAchievements + " conquistas desbloqueadas",
+                11, R.color.auren_primary), margins(0, 3, 0, 0));
+        card.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+
+        TextView arrow = text("›", 27, R.color.auren_primary);
+        arrow.setGravity(Gravity.CENTER);
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(58)));
+        card.setOnClickListener(v -> showAchievements());
+        return card;
+    }
+
     private View actionCard(String icon, String label, View.OnClickListener listener) {
-        LinearLayout card = rounded(0xFFEEECFF, 20);
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
         card.setGravity(Gravity.CENTER_VERTICAL);
         TextView i = text(icon, 23, R.color.auren_primary);
         i.setGravity(Gravity.CENTER);
@@ -1706,7 +1779,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private View playlistCard(String title, String subtitle, int count, boolean favorite) {
-        LinearLayout card = rounded(favorite ? 0xFFEEECFF : 0xFFFFFFFF, 18);
+        LinearLayout card = rounded(favorite ? ThemeManager.resolve(this, R.color.accent_soft) : ThemeManager.card(this), 18);
         card.setGravity(Gravity.CENTER_VERTICAL);
         TextView icon = text(favorite ? "♥" : "♫", 24, R.color.auren_primary);
         icon.setGravity(Gravity.CENTER);
@@ -1740,7 +1813,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private View chip(String label, boolean active, View.OnClickListener listener) {
-        LinearLayout c = rounded(active ? 0xFFEEECFF : 0xFFF5F5F7, 18);
+        LinearLayout c = rounded(active ? ThemeManager.resolve(this, R.color.accent_soft) : ThemeManager.resolve(this, R.color.surface_alt), 18);
         TextView t = text(label, 12, active ? R.color.auren_primary : R.color.text_secondary);
         t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         c.addView(t, margins(14, 7, 14, 7));
@@ -1749,7 +1822,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private View emptyCard(String message) {
-        LinearLayout card = rounded(0xFFF5F5F7, 18);
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.surface_alt), 18);
         TextView t = text(message, 13, R.color.text_secondary);
         t.setGravity(Gravity.CENTER);
         card.addView(t, margins(16, 18, 16, 18));
@@ -1947,7 +2020,7 @@ public class MainActivity extends ComponentActivity {
         card.setPadding(dp(8), dp(8), dp(8), dp(8));
         card.setElevation(dp(2));
 
-        LinearLayout cover = rounded(0xFFEEECFF, 16);
+        LinearLayout cover = rounded(ThemeManager.resolve(this, R.color.accent_soft), 16);
         cover.setGravity(Gravity.CENTER);
         TextView icon = text("♫", 28, R.color.auren_primary);
         icon.setGravity(Gravity.CENTER);
@@ -1998,7 +2071,7 @@ public class MainActivity extends ComponentActivity {
 
         List<Track> items = getPlaylistTracks(name);
         long total = playlistDuration(items);
-        LinearLayout summary = rounded(0xFFEEECFF, 18);
+        LinearLayout summary = rounded(ThemeManager.resolve(this, R.color.accent_soft), 18);
         summary.setGravity(Gravity.CENTER_VERTICAL);
         summary.setPadding(dp(14), dp(10), dp(14), dp(10));
         TextView count = text(items.size() + " músicas", 13, R.color.text_primary);
@@ -2060,6 +2133,95 @@ public class MainActivity extends ComponentActivity {
         seconds %= 60;
         if (hours > 0) return hours + ":" + String.format(Locale.US, "%02d:%02d", minutes, seconds);
         return minutes + ":" + String.format(Locale.US, "%02d", seconds);
+    }
+
+    private void showAchievements() {
+        pageContainer.removeAllViews();
+        LinearLayout content = column();
+        content.setPadding(dp(20), dp(16), dp(20), dp(22));
+
+        TextView eyebrow = text("SEU PROGRESSO", 11, R.color.auren_primary);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView title = text("Conquistas & Recordes", 28, R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(eyebrow);
+        content.addView(title, margins(0, 3, 0, 8));
+
+        AchievementManager.Stats stats = AchievementManager.stats(this);
+
+        LinearLayout metrics = row();
+        metrics.addView(statCard("Hoje", stats.today + " rep.", "Reproduções"), new LinearLayout.LayoutParams(0, dp(92), 1));
+        metrics.addView(statCard("Semana", stats.week + " rep.", "Reproduções"), margins(8, 0, 0, 0));
+        metrics.addView(statCard("Mês", stats.month + " rep.", "Reproduções"), margins(8, 0, 0, 0));
+        content.addView(metrics);
+
+        LinearLayout records = row();
+        records.addView(statCard("Recorde diário", String.valueOf(stats.bestDay), "melhor dia"), new LinearLayout.LayoutParams(0, dp(92), 1));
+        records.addView(statCard("Recorde semanal", String.valueOf(stats.bestWeek), "melhor semana"), margins(8, 0, 0, 0));
+        records.addView(statCard("Recorde mensal", String.valueOf(stats.bestMonth), "melhor mês"), margins(8, 0, 0, 0));
+        content.addView(records, margins(0, 8, 0, 0));
+
+        content.addView(text(
+                stats.totalPlays + " reproduções • " + stats.uniqueTracks + " músicas diferentes • "
+                        + stats.activeDays + " dias ativos", 12, R.color.text_secondary),
+                margins(2, 10, 2, 4));
+
+        LinearLayout achievementHeader = row();
+        TextView achievementLabel = text("CONQUISTAS", 11, R.color.auren_primary);
+        achievementLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        achievementHeader.addView(achievementLabel, new LinearLayout.LayoutParams(0, dp(40), 1));
+        TextView unlocked = text(stats.unlocked + "/" + stats.totalAchievements + " desbloqueadas", 11, R.color.text_secondary);
+        unlocked.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        achievementHeader.addView(unlocked, new LinearLayout.LayoutParams(-2, dp(40)));
+        content.addView(achievementHeader, margins(0, 14, 0, 2));
+
+        for (AchievementManager.Badge badge : AchievementManager.badges(this)) {
+            content.addView(achievementRow(badge), margins(0, 5, 0, 5));
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+    }
+
+    private View statCard(String label, String value, String hint) {
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.accent_soft), 18);
+        card.setPadding(dp(10), dp(10), dp(10), dp(8));
+        TextView l = text(label, 10, R.color.text_secondary);
+        l.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView v = text(value, 20, R.color.auren_primary);
+        v.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView h = text(hint, 10, R.color.text_secondary);
+        card.addView(l);
+        card.addView(v, margins(0, 2, 0, 0));
+        card.addView(h, margins(0, 1, 0, 0));
+        return card;
+    }
+
+    private View achievementRow(AchievementManager.Badge badge) {
+        int bg = badge.unlocked ? ThemeManager.resolve(this, R.color.accent_soft) : ThemeManager.card(this);
+        LinearLayout card = rounded(bg, 18);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        TextView icon = text(badge.unlocked ? "✓" : "○", 23,
+                badge.unlocked ? R.color.auren_primary : R.color.text_secondary);
+        icon.setGravity(Gravity.CENTER);
+        card.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(54)));
+
+        LinearLayout info = column();
+        TextView name = text(badge.title, 14, R.color.text_primary);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(name);
+        info.addView(text(badge.description, 11, R.color.text_secondary), margins(0, 2, 0, 0));
+        card.addView(info, new LinearLayout.LayoutParams(0, dp(54), 1));
+
+        TextView goal = text(badge.requirement, 10,
+                badge.unlocked ? R.color.auren_primary : R.color.text_secondary);
+        goal.setGravity(Gravity.CENTER);
+        goal.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(goal, new LinearLayout.LayoutParams(dp(76), dp(54)));
+        return card;
     }
 
     private void showMostPlayed() {
@@ -2135,7 +2297,7 @@ public class MainActivity extends ComponentActivity {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(size);
-        view.setTextColor(getColor(color));
+        view.setTextColor(ThemeManager.resolve(this, color));
         return view;
     }
 

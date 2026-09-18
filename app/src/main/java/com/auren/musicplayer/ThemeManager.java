@@ -41,14 +41,20 @@ public final class ThemeManager {
         if (resourceId == R.color.auren_primary) return accent(context);
         if (resourceId == R.color.auren_secondary) return blend(accent(context), Color.WHITE, 0.35f);
         if (resourceId == R.color.surface) return dark ? Color.rgb(15, 18, 23) : Color.rgb(246, 248, 252);
-        if (resourceId == R.color.surface_alt) return dark ? Color.rgb(25, 30, 38) : Color.rgb(238, 241, 247);
-        if (resourceId == R.color.card) return dark ? Color.rgb(27, 32, 40) : Color.WHITE;
+        if (resourceId == R.color.surface_alt) return dark
+                ? blend(accent(context), Color.rgb(25, 30, 38), 0.07f)
+                : blend(accent(context), Color.rgb(238, 241, 247), 0.035f);
+        if (resourceId == R.color.card) return dark
+                ? blend(accent(context), Color.rgb(27, 32, 40), 0.10f)
+                : blend(accent(context), Color.WHITE, 0.035f);
         if (resourceId == R.color.text_primary) return dark ? Color.rgb(244, 246, 249) : Color.rgb(17, 24, 39);
         if (resourceId == R.color.text_secondary) return dark ? Color.rgb(169, 179, 191) : Color.rgb(102, 112, 133);
         if (resourceId == R.color.line) return dark ? Color.rgb(48, 56, 68) : Color.rgb(229, 231, 235);
-        if (resourceId == R.color.accent_soft) return blend(accent(context), surface(context), 0.12f);
-        if (resourceId == R.color.accent_mint) return dark ? blend(accent(context), surface(context), 0.20f) : Color.rgb(220, 248, 241);
-        if (resourceId == R.color.playing_background) return blend(accent(context), surface(context), dark ? 0.22f : 0.10f);
+        if (resourceId == R.color.accent_soft) return blend(accent(context), surface(context), dark ? 0.24f : 0.16f);
+        if (resourceId == R.color.accent_mint) return dark
+                ? blend(accent(context), surface(context), 0.22f)
+                : blend(accent(context), Color.rgb(220, 248, 241), 0.16f);
+        if (resourceId == R.color.playing_background) return blend(accent(context), surface(context), dark ? 0.26f : 0.14f);
         if (resourceId == R.color.playing_text) return accent(context);
         return context.getColor(resourceId);
     }
