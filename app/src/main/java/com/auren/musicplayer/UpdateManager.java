@@ -392,13 +392,11 @@ public final class UpdateManager {
         }
 
         if (android.os.Build.VERSION.SDK_INT >= 26) {
-            PackageManager pm =
-                    activity.getPackageManager();
+            PackageManager pm = activity.getPackageManager();
 
             if (!pm.canRequestPackageInstalls()) {
                 status.setText(
-                        "Ative 'Permitir desta fonte' para "
-                                + "Music Player - Nexauren e volte aqui.");
+                        "Ative 'Permitir desta fonte' para o Music Player - Nexauren e volte aqui para instalar.");
 
                 Intent settings =
                         new Intent(
@@ -418,8 +416,7 @@ public final class UpdateManager {
                 file);
 
         Intent installer =
-                new Intent(
-                        Intent.ACTION_INSTALL_PACKAGE);
+                new Intent(Intent.ACTION_VIEW);
 
         installer.setDataAndType(
                 uri,
@@ -430,25 +427,17 @@ public final class UpdateManager {
                         "NexaurenUpdate",
                         uri));
 
-        installer.putExtra(
-                Intent.EXTRA_NOT_UNKNOWN_SOURCE,
-                true);
-
-        installer.putExtra(
-                Intent.EXTRA_RETURN_RESULT,
-                false);
-
         installer.addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_ACTIVITY_NEW_TASK);
 
         try {
             activity.startActivity(installer);
 
             status.setText(
-                    "Instalador do Android aberto. "
-                            + "Confirme em 'Instalar'.");
-
-            clearPending(activity);
+                    "Instalador do Android aberto. Confirme em 'Instalar'.");
+            // Keep the file until the user returns; this also allows recovery
+            // if Android sends the user to the unknown-app-source settings.
             finish(callback);
             return;
         } catch (ActivityNotFoundException ignored) {
@@ -468,7 +457,8 @@ public final class UpdateManager {
                         uri));
 
         fallback.addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_ACTIVITY_NEW_TASK);
 
         try {
             activity.startActivity(fallback);
@@ -477,7 +467,6 @@ public final class UpdateManager {
                     "Instalador do Android aberto. "
                             + "Confirme em 'Instalar'.");
 
-            clearPending(activity);
             finish(callback);
         } catch (Exception error) {
             status.setText(
