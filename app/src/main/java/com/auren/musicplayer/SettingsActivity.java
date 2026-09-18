@@ -26,6 +26,12 @@ public class SettingsActivity extends ComponentActivity {
         buildUi();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (updateStatus != null) UpdateManager.resumePending(this, updateStatus);
+    }
+
     private void buildUi() {
         LinearLayout root = column();
         root.setBackgroundColor(ThemeManager.surface(this));
