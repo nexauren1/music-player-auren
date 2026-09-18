@@ -85,6 +85,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK artifact
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: Nexauren-Music-Player-v${{ steps.version.outputs.version }}
@@ -93,6 +94,7 @@ jobs:
             Nexauren-Music-Player.apk.sha256
 
       - name: Publish GitHub Release
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -120,7 +122,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           MODE: ${{ steps.build.outputs.mode }}
           RUN_NUMBER: ${{ github.run_number }}
+          RUN_ID: ${{ github.run_id }}
           COMMIT_SHA: ${{ github.sha }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          VERSION_OUTCOME: ${{ steps.version.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
         run: |
           set -euo pipefail
           STATUS="${{ job.status }}"
@@ -131,8 +138,13 @@ jobs:
             "version": "${VERSION}",
             "tag": "${TAG}",
             "run_number": "${RUN_NUMBER}",
+            "run_id": "${RUN_ID}",
             "commit": "${COMMIT_SHA}",
             "mode": "${MODE}",
+            "build_outcome": "${BUILD_OUTCOME}",
+            "version_outcome": "${VERSION_OUTCOME}",
+            "upload_outcome": "${UPLOAD_OUTCOME}",
+            "publish_outcome": "${PUBLISH_OUTCOME}",
             "workflow": "Android Release"
           }
           EOF
