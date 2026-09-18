@@ -289,7 +289,7 @@ public final class UpdateManager {
             status.setText("Ative a permissão de instalação para concluir a atualização.");
             return;
         }
-        openInstaller(activity, status, file, "pendente", () -> clearPending(activity));
+        openInstaller(activity, status, file, () -> clearPending(activity));
     }
 
     private static void clearPending(Activity activity) {
