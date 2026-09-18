@@ -220,7 +220,7 @@ public final class AurenAnalytics {
         String raw = p.getString("sessions", "");
         if (!raw.isEmpty()) {
             for (String line : raw.split("\n")) {
-                String[] parts = line.split("\|", 3);
+                String[] parts = line.split("\\|", 3);
                 if (parts.length != 3) continue;
                 try {
                     out.add(new Session(Long.parseLong(parts[0]), Long.parseLong(parts[1]), parts[2]));
