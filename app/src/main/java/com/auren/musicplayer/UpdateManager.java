@@ -111,6 +111,8 @@ public final class UpdateManager {
                     finish(callback);
                     return;
                 }
+                activity.getSharedPreferences("auren_player", Activity.MODE_PRIVATE)
+                        .edit().putString("pending_update_apk", downloaded.getAbsolutePath()).apply();
                 openInstaller(activity, status, downloaded, callback);
             });
         });
@@ -270,6 +272,29 @@ public final class UpdateManager {
     private static int num(String value) {
         Matcher matcher = Pattern.compile("\\d+").matcher(value);
         return matcher.find() ? Integer.parseInt(matcher.group()) : 0;
+    }
+
+    public static void resumePending(Activity activity, TextView status) {
+        String path = activity.getSharedPreferences("auren_player", Activity.MODE_PRIVATE)
+                .getString("pending_update_apk", "");
+        if (path == null || path.isEmpty()) return;
+        File file = new File(path);
+        if (!file.isFile() || file.length() < 100_000) {
+            clearPending(activity);
+            return;
+        }
+        status.setText("Atualização pronta. A abrir o instalador…");
+        if (android.os.Build.VERSION.SDK_INT >= 26
+                && !activity.getPackageManager().canRequestPackageInstalls()) {
+            status.setText("Ative a permissão de instalação para concluir a atualização.");
+            return;
+        }
+        openInstaller(activity, status, file, "pendente", () -> clearPending(activity));
+    }
+
+    private static void clearPending(Activity activity) {
+        activity.getSharedPreferences("auren_player", Activity.MODE_PRIVATE)
+                .edit().remove("pending_update_apk").apply();
     }
 
     private static void finish(Callback callback) {
