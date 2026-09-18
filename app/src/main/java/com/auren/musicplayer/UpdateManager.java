@@ -121,7 +121,7 @@ public final class UpdateManager {
     private static File download(Activity activity, TextView status,
                                  String address, String version) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
-        connection.setRequestProperty("User-Agent", "Nexauren-Music-Player");
+        connection.setRequestProperty("User-Agent", "Music-Player-Nexauren");
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(30000);
         connection.setInstanceFollowRedirects(true);
@@ -134,7 +134,7 @@ public final class UpdateManager {
         int total = connection.getContentLength();
         int done = 0;
         File cache = activity.getCacheDir();
-        File out = new File(cache, "auren-update.apk");
+        File out = new File(cache, "nexauren-update.apk");
         if (out.exists() && !out.delete()) {
             throw new IllegalStateException("Could not replace cached APK");
         }
@@ -204,31 +204,43 @@ public final class UpdateManager {
         installer.setDataAndType(uri, APK_TYPE);
         installer.setClipData(ClipData.newRawUri("NexaurenUpdate", uri));
         installer.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
+        installer.putExtra(Intent.EXTRA_RETURN_RESULT, false);
         installer.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        installer.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 
+        // Some Android/OEM package installers only respond reliably when the
+        // resolved installer activity is launched explicitly.
         try {
-            activity.startActivity(installer);
-            status.setText("Instalador do Android aberto. Toque em Atualizar para concluir.");
-        } catch (Exception firstError) {
-            Intent fallback = new Intent(Intent.ACTION_VIEW);
-            fallback.setDataAndType(uri, APK_TYPE);
-            fallback.setClipData(ClipData.newRawUri("NexaurenUpdate", uri));
-            fallback.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            try {
-                activity.startActivity(fallback);
-                status.setText("Instalador do Android aberto. Toque em Atualizar para concluir.");
-            } catch (Exception secondError) {
-                status.setText("Não foi possível abrir o instalador do Android. Verifique a permissão de instalar aplicações.");
-                finish(callback);
+            android.content.ComponentName component = installer.resolveActivity(activity.getPackageManager());
+            if (component != null) {
+                installer.setComponent(component);
+                activity.startActivity(installer);
+                status.setText("Instalador aberto. Toque em Instalar para concluir.");
+                return;
             }
+        } catch (Exception ignored) {
+        }
+
+        // Fallback for devices whose package installer exposes ACTION_VIEW.
+        Intent fallback = new Intent(Intent.ACTION_VIEW);
+        fallback.setDataAndType(uri, APK_TYPE);
+        fallback.setClipData(ClipData.newRawUri("NexaurenUpdate", uri));
+        fallback.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            android.content.ComponentName component = fallback.resolveActivity(activity.getPackageManager());
+            if (component == null) throw new IllegalStateException("No APK installer activity");
+            fallback.setComponent(component);
+            activity.startActivity(fallback);
+            status.setText("Instalador aberto. Toque em Instalar para concluir.");
+        } catch (Exception error) {
+            status.setText("O APK foi baixado, mas o instalador não abriu. Ative 'Permitir desta fonte' para o Music Player - Nexauren e tente novamente.");
+            finish(callback);
         }
     }
 
     private static String request(String address) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
         connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setRequestProperty("User-Agent", "Nexauren-Music-Player");
+        connection.setRequestProperty("User-Agent", "Music-Player-Nexauren");
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(15000);
         try (InputStream in = connection.getInputStream();
