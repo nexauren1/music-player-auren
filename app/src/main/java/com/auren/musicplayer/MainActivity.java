@@ -13,7 +13,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Looper;
 import android.os.Handler;
 import android.provider.MediaStore;
 import android.view.Gravity;
@@ -160,7 +159,7 @@ public class MainActivity extends ComponentActivity {
         root.addView(miniContainer, new LinearLayout.LayoutParams(-1, dp(70)));
         root.addView(buildBottomNavigation());
         setContentView(root);
-        showInício();
+        showHome();
     }
     private View buildTopBar() {
         LinearLayout bar = row();
@@ -186,7 +185,7 @@ public class MainActivity extends ComponentActivity {
     }
 
 
-    private View buildInícioHero() {
+    private View buildHomeHero() {
         LinearLayout card = rounded(getColor(R.color.auren_primary), 26);
         card.setPadding(dp(16), dp(16), dp(16), dp(16));
         card.setElevation(dp(4));
@@ -232,7 +231,7 @@ public class MainActivity extends ComponentActivity {
         return card;
     }
 
-    private void showInício() {
+    private void showHome() {
         setActiveTab(homeTab);
         pageContainer.removeAllViews();
 
@@ -252,17 +251,17 @@ public class MainActivity extends ComponentActivity {
         header.addView(brandBox, new LinearLayout.LayoutParams(0, -2, 1));
         content.addView(header);
 
-        content.addView(buildInícioHero(), margins(0, 8, 0, 0));
+        content.addView(buildHomeHero(), margins(0, 8, 0, 0));
 
         LinearLayout quick = row();
         quick.setGravity(Gravity.CENTER_VERTICAL);
         quick.addView(actionCard("▶", "Aleatório", v -> shufflePlay()), new LinearLayout.LayoutParams(0, dp(82), 1));
-        quick.addView(actionCard("♥", "Favoritos", v -> showBiblioteca(true)), margins(10, 0, 0, 0));
+        quick.addView(actionCard("♥", "Favoritos", v -> showLibrary(true)), margins(10, 0, 0, 0));
         content.addView(quick, margins(0, 18, 0, 0));
 
-        addSectionHeader(content, "Reproduzidas recentemente", "Ver tudo", v -> showBiblioteca());
+        addSectionHeader(content, "Reproduzidas recentemente", "Ver tudo", v -> showLibrary());
         if (recentTracks.isEmpty()) {
-            content.addView(emptyCard("Your recently played songs will appear here."));
+            content.addView(emptyCard("As músicas reproduzidas recentemente aparecerão aqui."));
         } else {
             LinearLayout recentRow = row();
             HorizontalScrollView horizontal = new HorizontalScrollView(this);
@@ -275,10 +274,10 @@ public class MainActivity extends ComponentActivity {
             content.addView(horizontal);
         }
 
-        addSectionHeader(content, "Mais tocadas", "Your favorites", v -> showMostPlayed());
+        addSectionHeader(content, "Mais tocadas", "Seus favoritos", v -> showMostPlayed());
         List<Track> mostPlayed = sortedByPlayCount();
         if (mostPlayed.isEmpty() || playCounts.getOrDefault(mostPlayed.get(0).id, 0) == 0) {
-            content.addView(emptyCard("Play some songs and your most played list will grow."));
+            content.addView(emptyCard("Reproduza algumas músicas e sua lista de mais tocadas aparecerá aqui."));
         } else {
             for (int i = 0; i < Math.min(4, mostPlayed.size()); i++) {
                 content.addView(trackRow(mostPlayed.get(i), i + 1));
@@ -286,20 +285,29 @@ public class MainActivity extends ComponentActivity {
         }
 
         // AUREN_ALL_SONGS_HOME_START
-        addSectionHeader(content, "Todas as músicas", tracks.size() + " músicas", v -> showBiblioteca());
+        addSectionHeader(content, "Todas as músicas", tracks.size() + " músicas", v -> showLibrary());
         if (tracks.isEmpty()) {
             content.addView(emptyCard("Nenhuma música encontrada no dispositivo."));
         } else {
-            for (Track track : tracks) {
-                content.addView(trackRow(track, 0));
+            int visible = Math.min(12, tracks.size());
+            for (int i = 0; i < visible; i++) {
+                content.addView(trackRow(tracks.get(i), 0));
+            }
+            if (tracks.size() > visible) {
+                TextView more = text("Ver todas as " + tracks.size() + " músicas", 13, R.color.auren_primary);
+                more.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                more.setGravity(Gravity.CENTER);
+                more.setPadding(dp(8), dp(14), dp(8), dp(14));
+                more.setOnClickListener(v -> showLibrary());
+                content.addView(more);
             }
         }
         // AUREN_ALL_SONGS_HOME_END
 
-        addSectionHeader(content, "Sugestões para você", "Atualizar", v -> showInício());
+        addSectionHeader(content, "Sugestões para você", "Atualizar", v -> showHome());
         List<Track> suggestions = suggestionTracks();
         if (suggestions.isEmpty()) {
-            content.addView(emptyCard("Suggestions will appear after your library is loaded."));
+            content.addView(emptyCard("As sugestões aparecerão quando sua biblioteca for carregada."));
         } else {
             for (int i = 0; i < Math.min(5, suggestions.size()); i++) {
                 content.addView(trackRow(suggestions.get(i), 0));
@@ -310,7 +318,7 @@ public class MainActivity extends ComponentActivity {
         pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
     }
 
-    private void showBiblioteca() {
+    private void showLibrary() {
         setActiveTab(libraryTab);
         pageContainer.removeAllViews();
 
@@ -319,7 +327,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(22));
 
-        TextView eyebrow = text("YOUR LIBRARY", 11, R.color.auren_primary);
+        TextView eyebrow = text("SUA BIBLIOTECA", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Biblioteca", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -330,13 +338,13 @@ public class MainActivity extends ComponentActivity {
         content.addView(librarySectionCard("Recentes", "O que você ouviu recentemente", "◷", v -> showRecent()), margins(0, 10, 0, 0));
         content.addView(librarySectionCard("Playlists", "Suas coleções de músicas", "▤", v -> showPlaylists()), margins(0, 10, 0, 0));
         content.addView(librarySectionCard("Sugestões", "Músicas escolhidas da sua biblioteca", "✦", v -> showSuggestions()), margins(0, 10, 0, 0));
-        content.addView(librarySectionCard("Favoritos", "Músicas que você marcou com ♥", "♥", v -> showBiblioteca(true)), margins(0, 10, 0, 0));
+        content.addView(librarySectionCard("Favoritos", "Músicas que você marcou com ♥", "♥", v -> showLibrary(true)), margins(0, 10, 0, 0));
 
         scroll.addView(content);
         pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
     }
 
-    private void showBiblioteca(boolean favoritesOnly) {
+    private void showLibrary(boolean favoritesOnly) {
         setActiveTab(libraryTab);
         pageContainer.removeAllViews();
 
@@ -344,7 +352,7 @@ public class MainActivity extends ComponentActivity {
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
         LinearLayout header = row();
         LinearLayout titles = column();
-        TextView eyebrow = text("YOUR FAVORITES", 11, R.color.auren_primary);
+        TextView eyebrow = text("SEUS FAVORITOS", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Favoritos", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -359,7 +367,7 @@ public class MainActivity extends ComponentActivity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout list = column();
         List<Track> source = new ArrayList<>();
-        for (Track t : tracks) if (isFavoritar(t)) source.add(t);
+        for (Track t : tracks) if (isFavorite(t)) source.add(t);
         if (source.isEmpty()) {
             list.addView(emptyCard("Ainda não há favoritos. Toque no coração durante a reprodução."));
         } else {
@@ -400,7 +408,7 @@ public class MainActivity extends ComponentActivity {
         pageContainer.removeAllViews();
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
-        TextView eyebrow = text("YOUR HISTORY", 11, R.color.auren_primary);
+        TextView eyebrow = text("SEU HISTÓRICO", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Recentes", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -423,7 +431,7 @@ public class MainActivity extends ComponentActivity {
         pageContainer.removeAllViews();
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
-        TextView eyebrow = text("FOR YOU", 11, R.color.auren_primary);
+        TextView eyebrow = text("PARA VOCÊ", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Sugestões", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -447,7 +455,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(20), dp(16), dp(20), dp(18));
 
-        TextView eyebrow = text("YOUR COLLECTION", 11, R.color.auren_primary);
+        TextView eyebrow = text("SUA COLEÇÃO", 11, R.color.auren_primary);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Playlists", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -469,9 +477,9 @@ public class MainActivity extends ComponentActivity {
         create.setOnClickListener(v -> showCreatePlaylistDialog());
         content.addView(create, margins(0, 18, 0, 12));
 
-        content.addView(playlistCard("Liked songs", "Songs you marked as favorite", countFavoritos(), true));
-        content.addView(playlistCard("Reproduzidas recentemente", "Your latest listening history", recentTracks.size(), false), margins(0, 10, 0, 0));
-        content.addView(playlistCard("Mais tocadas", "The tracks you play the most", Math.min(10, tracks.size()), false), margins(0, 10, 0, 0));
+        content.addView(playlistCard("Músicas favoritas", "Músicas que você marcou como favorita", countFavorites(), true));
+        content.addView(playlistCard("Reproduzidas recentemente", "Seu histórico de reprodução", recentTracks.size(), false), margins(0, 10, 0, 0));
+        content.addView(playlistCard("Mais tocadas", "As músicas que você mais ouve", Math.min(10, tracks.size()), false), margins(0, 10, 0, 0));
 
         Set<String> names = getSharedPreferences("auren_player", MODE_PRIVATE)
                 .getStringSet("playlist_names", new HashSet<>());
@@ -495,8 +503,8 @@ public class MainActivity extends ComponentActivity {
         nav.setGravity(Gravity.CENTER);
         nav.setPadding(dp(8), dp(5), dp(8), dp(8));
         nav.setBackgroundColor(Color.WHITE);
-        homeTab = navItem("HOME", "Início", v -> showInício());
-        libraryTab = navItem("LIBRARY", "Biblioteca", v -> showBiblioteca());
+        homeTab = navItem("HOME", "Início", v -> showHome());
+        libraryTab = navItem("LIBRARY", "Biblioteca", v -> showLibrary());
         playlistTab = navItem("PLAYLIST", "Playlists", v -> showPlaylists());
         nav.addView(homeTab, new LinearLayout.LayoutParams(0, dp(58), 1));
         nav.addView(libraryTab, new LinearLayout.LayoutParams(0, dp(58), 1));
@@ -555,9 +563,9 @@ public class MainActivity extends ComponentActivity {
         LinearLayout items = column();
         items.setPadding(dp(10), dp(12), dp(10), dp(16));
 
-        addDrawerItem(items, "⌂", "Início", () -> { dialog.dismiss(); showInício(); });
-        addDrawerItem(items, "♫", "Biblioteca", () -> { dialog.dismiss(); showBiblioteca(); });
-        addDrawerItem(items, "♥", "Favoritos", () -> { dialog.dismiss(); showBiblioteca(true); });
+        addDrawerItem(items, "⌂", "Início", () -> { dialog.dismiss(); showHome(); });
+        addDrawerItem(items, "♫", "Biblioteca", () -> { dialog.dismiss(); showLibrary(); });
+        addDrawerItem(items, "♥", "Favoritos", () -> { dialog.dismiss(); showLibrary(true); });
         addDrawerItem(items, "▤", "Playlists", () -> { dialog.dismiss(); showPlaylists(); });
         addDrawerItem(items, "🔥", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
         addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
@@ -616,7 +624,7 @@ public class MainActivity extends ComponentActivity {
     private void showAboutDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Auren Music")
-                .setMessage("A clean, modern music player built around your local library.\n\nVersion " + BuildConfig.VERSION_NAME + "\n\nMusic that moves with you.")
+                .setMessage("Um player de música moderno, feito para a sua biblioteca local.\n\nVersion " + BuildConfig.VERSION_NAME + "\n\nMusic that moves with you.")
                 .setPositiveButton("Fechar", null)
                 .show();
     }
@@ -656,8 +664,8 @@ public class MainActivity extends ComponentActivity {
         }
         LinearLayout list = column();
         list.setPadding(dp(18), dp(10), dp(18), dp(18));
-        TextView resultTitle = text(matches.size() + " result" + (matches.size() == 1 ? "" : "s"), 13, R.color.auren_primary);
-        resultTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView resultadoTitle = text(matches.size() + " resultado" + (matches.size() == 1 ? "" : "s"), 13, R.color.auren_primary);
+        resultadoTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         list.addView(resultTitle, margins(0, 4, 0, 8));
         for (Track track : matches) list.addView(trackRow(track, 0));
         ScrollView scroll = new ScrollView(this);
@@ -1213,10 +1221,10 @@ public class MainActivity extends ComponentActivity {
         else ActivityCompat.requestPermissions(this, new String[]{permission}, MUSIC_PERMISSION);
     }
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] results) {
-        super.onRequestPermissionsResult(requestCode, permissions, results);
-        if (requestCode == MUSIC_PERMISSION && results.length > 0
-                && results[0] == PackageManager.PERMISSION_GRANTED) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] resultados) {
+        super.onRequestPermissionsResult(requestCode, permissions, resultados);
+        if (requestCode == MUSIC_PERMISSION && resultados.length > 0
+                && resultados[0] == PackageManager.PERMISSION_GRANTED) {
             loadMusic();
         } else if (requestCode == MUSIC_PERMISSION) {
             Toast.makeText(this,
@@ -1243,7 +1251,7 @@ public class MainActivity extends ComponentActivity {
                 null,
                 MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
             if (cursor != null) {
-                while (cursor.moveToNext()) {
+                while (cursor.moveToPróxima música()) {
                     tracks.add(new Track(
                             cursor.getLong(0),
                             cursor.getString(1),
@@ -1253,9 +1261,9 @@ public class MainActivity extends ComponentActivity {
                 }
             }
         }
-        applyBibliotecaSort();
+        applyLibrarySort();
         restoreListeningState();
-        if (pageContainer != null) showInício();
+        if (pageContainer != null) showHome();
     }
 
     private void showQueueDialog() {
@@ -1396,30 +1404,30 @@ public class MainActivity extends ComponentActivity {
                     librarySortMode = which == 1 ? "artist" : which == 2 ? "duration_asc" : which == 3 ? "duration_desc" : "title";
                     getSharedPreferences("auren_player", MODE_PRIVATE).edit()
                             .putString("library_sort", librarySortMode).apply();
-                    applyBibliotecaSort();
-                    showInício();
+                    applyLibrarySort();
+                    showHome();
                     dialog.dismiss();
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
     }
 
-    private void applyBibliotecaSort() {
+    private void applyLibrarySort() {
         librarySortMode = getSharedPreferences("auren_player", MODE_PRIVATE)
                 .getString("library_sort", librarySortMode);
         Collections.sort(tracks, new Comparator<Track>() {
             @Override public int compare(Track a, Track b) {
-                int result;
+                int resultado;
                 if (librarySortMode.equals("artist")) {
-                    result = safeArtist(a).compareToIgnoreCase(safeArtist(b));
+                    resultado = safeArtist(a).compareToIgnoreCase(safeArtist(b));
                 } else if (librarySortMode.equals("duration_asc")) {
-                    result = Long.compare(a.durationMs, b.durationMs);
+                    resultado = Long.compare(a.durationMs, b.durationMs);
                 } else if (librarySortMode.equals("duration_desc")) {
-                    result = Long.compare(b.durationMs, a.durationMs);
+                    resultado = Long.compare(b.durationMs, a.durationMs);
                 } else {
-                    result = safeTitle(a).compareToIgnoreCase(safeTitle(b));
+                    resultado = safeTitle(a).compareToIgnoreCase(safeTitle(b));
                 }
-                if (result != 0) return result;
+                if (result != 0) return resultado;
                 return safeTitle(a).compareToIgnoreCase(safeTitle(b));
             }
         });
@@ -1498,7 +1506,7 @@ public class MainActivity extends ComponentActivity {
         row.addView(info, new LinearLayout.LayoutParams(0, dp(56), 1));
 
         if (number > 0) {
-            TextView reproduções = text(playCounts.getOrDefault(track.id, 0) + " reproduções", 10, R.color.text_secondary);
+            TextView plays = text(playCounts.getOrDefault(track.id, 0) + " reproduções", 10, R.color.text_secondary);
             reproduções.setGravity(Gravity.CENTER);
             row.addView(reproduções, new LinearLayout.LayoutParams(dp(72), dp(48)));
         }
@@ -1535,7 +1543,7 @@ public class MainActivity extends ComponentActivity {
         c.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         c.setGravity(Gravity.CENTER);
         card.addView(c, new LinearLayout.LayoutParams(dp(48), dp(66)));
-        if (favorite) card.setOnClickListener(v -> showBiblioteca(true));
+        if (favorite) card.setOnClickListener(v -> showLibrary(true));
         else if (isCustomPlaylist(title)) card.setOnClickListener(v -> showPlaylistPage(title));
         return card;
     }
@@ -1571,11 +1579,11 @@ public class MainActivity extends ComponentActivity {
     }
 
     private String safeTitle(Track track) {
-        return track == null || track.title == null || track.title.trim().isEmpty() ? "Untitled" : track.title;
+        return track == null || track.title == null || track.title.trim().isEmpty() ? "Sem título" : track.title;
     }
 
     private String safeArtist(Track track) {
-        return track == null || track.artist == null || track.artist.trim().isEmpty() ? "Unknown artist" : track.artist;
+        return track == null || track.artist == null || track.artist.trim().isEmpty() ? "Artista desconhecido" : track.artist;
     }
 
     private List<Track> sortedByPlayCount() {
@@ -1589,26 +1597,26 @@ public class MainActivity extends ComponentActivity {
     }
 
     private List<Track> suggestionTracks() {
-        List<Track> result = new ArrayList<>();
+        List<Track> resultado = new ArrayList<>();
         for (Track track : tracks) {
             if (currentTrack != null && track.id == currentTrack.id) continue;
-            if (!result.contains(track)) result.add(track);
+            if (!result.contains(track)) resultado.add(track);
             if (result.size() >= 8) break;
         }
-        return result;
+        return resultado;
     }
 
-    private int countFavoritos() {
+    private int countFavorites() {
         int count = 0;
-        for (Track t : tracks) if (isFavoritar(t)) count++;
+        for (Track t : tracks) if (isFavorite(t)) count++;
         return count;
     }
 
-    private boolean isFavoritar(Track track) {
+    private boolean isFavorite(Track track) {
         return getSharedPreferences("auren_player", MODE_PRIVATE).getBoolean("fav_" + track.id, false);
     }
 
-    private void setFavoritar(Track track, boolean value) {
+    private void setFavorite(Track track, boolean value) {
         getSharedPreferences("auren_player", MODE_PRIVATE).edit().putBoolean("fav_" + track.id, value).apply();
     }
 
@@ -1618,7 +1626,7 @@ public class MainActivity extends ComponentActivity {
         popup.getMenu().add("Reproduzir a seguir");
         popup.getMenu().add("Adicionar à fila");
         popup.getMenu().add("Adicionar à playlist");
-        popup.getMenu().add(isFavoritar(track) ? "Remover dos favoritos" : "Adicionar aos favoritos");
+        popup.getMenu().add(isFavorite(track) ? "Remover dos favoritos" : "Adicionar aos favoritos");
         popup.getMenu().add("Enviar");
         popup.getMenu().add("Detalhes");
         popup.setOnMenuItemClickListener(item -> {
@@ -1627,16 +1635,16 @@ public class MainActivity extends ComponentActivity {
                 play(track);
                 openNowPlaying();
             } else if (action.equals("Reproduzir a seguir")) {
-                addTrackToFila(track, true);
+                addTrackToQueue(track, true);
                 Toast.makeText(this, "Adicionado para reproduzir a seguir.", Toast.LENGTH_SHORT).show();
             } else if (action.equals("Adicionar à fila")) {
-                addTrackToFila(track, false);
+                addTrackToQueue(track, false);
                 Toast.makeText(this, "Adicionado à fila.", Toast.LENGTH_SHORT).show();
             } else if (action.equals("Adicionar à playlist")) {
                 showAddToPlaylistDialog(track);
             } else if (action.contains("favoritos")) {
-                setFavoritar(track, !isFavoritar(track));
-                showInício();
+                setFavorite(track, !isFavorite(track));
+                showHome();
             } else if (action.equals("Enviar")) {
                 shareTrack(track);
             } else if (action.equals("Detalhes")) {
@@ -1646,7 +1654,7 @@ public class MainActivity extends ComponentActivity {
         });
         popup.show();
     }
-    private void addTrackToFila(Track track, boolean next) {
+    private void addTrackToQueue(Track track, boolean next) {
         if (track == null) return;
         playQueue.remove(track);
         if (next) playQueue.add(0, track);
@@ -1840,23 +1848,23 @@ public class MainActivity extends ComponentActivity {
     }
 
     private List<Track> getPlaylistTracks(String name) {
-        List<Track> result = new ArrayList<>();
+        List<Track> resultado = new ArrayList<>();
         String value = getSharedPreferences("auren_player", MODE_PRIVATE)
                 .getString("playlist_" + name, "");
-        if (value == null || value.trim().isEmpty()) return result;
+        if (value == null || value.trim().isEmpty()) return resultado;
         for (String idValue : value.split(",")) {
             try {
                 long id = Long.parseLong(idValue.trim());
                 for (Track track : tracks) {
                     if (track.id == id) {
-                        result.add(track);
+                        resultado.add(track);
                         break;
                     }
                 }
             } catch (NumberFormatException ignored) {
             }
         }
-        return result;
+        return resultado;
     }
 
     private long playlistDuration(List<Track> items) {
@@ -1877,7 +1885,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void showMostPlayed() {
-        showBiblioteca();
+        showLibrary();
         Toast.makeText(this, "Mais tocadas is ranked on the Início screen.", Toast.LENGTH_SHORT).show();
     }
 
