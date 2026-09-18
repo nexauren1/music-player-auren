@@ -168,9 +168,6 @@ public class MainActivity extends ComponentActivity {
                 && getIntent().getStringExtra("nexauren_update_action") != null) {
             handleUpdateIntent(getIntent());
         }
-        if (savedInstanceState == null && intentHasUpdateAction(getIntent())) {
-            handleUpdateIntent(getIntent());
-        }
     }
 
     private void connectPlaybackController() {
