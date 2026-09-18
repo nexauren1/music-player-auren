@@ -585,18 +585,22 @@ public class MainActivity extends ComponentActivity {
         LinearLayout items = column();
         items.setPadding(dp(10), dp(12), dp(10), dp(16));
 
+        addDrawerSection(items, "BIBLIOTECA");
         addDrawerItem(items, "⌂", "Início", () -> { dialog.dismiss(); showHome(); });
         addDrawerItem(items, "♫", "Biblioteca", () -> { dialog.dismiss(); showLibrary(); });
         addDrawerItem(items, "♥", "Favoritos", () -> { dialog.dismiss(); showLibrary(true); });
         addDrawerItem(items, "▤", "Playlists", () -> { dialog.dismiss(); showPlaylists(); });
-        addDrawerItem(items, "🔥", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
+
+        addDrawerSection(items, "ATIVIDADE");
+        addDrawerItem(items, "↗", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
         addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
         addDrawerItem(items, "✦", "Sugestões", () -> { dialog.dismiss(); showSuggestions(); });
 
-        View divider = new View(this);
-        divider.setBackgroundColor(0xFFE4E8EF);
-        items.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
-
+        addDrawerSection(items, "FERRAMENTAS");
+        addDrawerItem(items, "≋", "Equalizador", () -> {
+            dialog.dismiss();
+            startActivity(new Intent(this, EqualizerActivity.class));
+        });
         addDrawerItem(items, "⚙", "Configurações", () -> {
             dialog.dismiss();
             startActivity(new Intent(this, SettingsActivity.class));
@@ -620,6 +624,13 @@ public class MainActivity extends ComponentActivity {
                     -1
             );
         }
+    }
+
+    private void addDrawerSection(LinearLayout parent, String label) {
+        TextView section = text(label, 10, R.color.text_secondary);
+        section.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        section.setLetterSpacing(0.08f);
+        parent.addView(section, margins(14, 12, 10, 4));
     }
 
     private void addDrawerItem(LinearLayout parent, String icon, String label, Runnable action) {
@@ -1093,9 +1104,24 @@ public class MainActivity extends ComponentActivity {
     private void restoreListeningState() {
         SharedPreferences prefs = getSharedPreferences("auren_player", MODE_PRIVATE);
         playCounts.clear();
+        String serializedCounts = prefs.getString("play_counts_v2", "");
+        if (!serializedCounts.isEmpty()) {
+            for (String entry : serializedCounts.split(";")) {
+                String[] pair = entry.split("=", 2);
+                if (pair.length != 2) continue;
+                try {
+                    long id = Long.parseLong(pair[0]);
+                    int count = Integer.parseInt(pair[1]);
+                    if (count > 0) playCounts.put(id, count);
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        // Backward-compatible fallback for versions that stored one key per track.
         for (Track track : tracks) {
-            int count = prefs.getInt("play_count_" + track.id, 0);
-            if (count > 0) playCounts.put(track.id, count);
+            if (!playCounts.containsKey(track.id)) {
+                int count = prefs.getInt("play_count_" + track.id, 0);
+                if (count > 0) playCounts.put(track.id, count);
+            }
         }
 
         recentTracks.clear();
@@ -1123,10 +1149,21 @@ public class MainActivity extends ComponentActivity {
             if (history.length() > 0) history.append(',');
             history.append(recent.id);
         }
+
+        StringBuilder counts = new StringBuilder();
+        for (Map.Entry<Long, Integer> entry : playCounts.entrySet()) {
+            if (counts.length() > 0) counts.append(';');
+            counts.append(entry.getKey()).append('=').append(entry.getValue());
+        }
+
         getSharedPreferences("auren_player", MODE_PRIVATE).edit()
+                .putString("play_counts_v2", counts.toString())
                 .putInt("play_count_" + track.id, playCounts.getOrDefault(track.id, 0))
                 .putString("recent_tracks", history.toString())
-                .apply();
+                .putLong("last_played_id", track.id)
+                .putLong("last_played_at", System.currentTimeMillis())
+                .putInt("stats_schema", 2)
+                .commit();
     }
     private void play(Track track) {
         if (track == null) return;
