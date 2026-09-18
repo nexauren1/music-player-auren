@@ -1,9 +1,14 @@
 {
   "status": "failure",
   "version": "",
-  "tag": "v-build.232",
-  "run_number": "232",
-  "commit": "a5954bc24bf91b6f4bca328779ee05914a2d1b16",
+  "tag": "v-build.233",
+  "run_number": "233",
+  "run_id": "35319552779",
+  "commit": "e44f3c3ffd7fb6d1fa089af27fea26443eba3266",
   "mode": "",
+  "build_outcome": "failure",
+  "version_outcome": "skipped",
+  "upload_outcome": "skipped",
+  "publish_outcome": "skipped",
   "workflow": "Android Release"
 }
