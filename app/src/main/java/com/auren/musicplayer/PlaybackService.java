@@ -2,6 +2,7 @@ package com.auren.musicplayer;
 
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
+import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
@@ -28,6 +29,13 @@ public final class PlaybackService extends MediaSessionService {
         player.setHandleAudioBecomingNoisy(true);
 
         AudioEffectsManager.attach(this, player.getAudioSessionId());
+        player.addListener(new Player.Listener() {
+            @Override public void onPlaybackStateChanged(int state) {
+                if (state == Player.STATE_READY && !AudioEffectsManager.available()) {
+                    AudioEffectsManager.attach(PlaybackService.this, player.getAudioSessionId());
+                }
+            }
+        });
         mediaSession = new MediaSession.Builder(this, player).build();
     }
 
