@@ -57,7 +57,7 @@ public class SettingsActivity extends ComponentActivity {
         LinearLayout content = column();
         content.setPadding(dp(18), dp(18), dp(18), dp(28));
 
-        addSection(content, "APARÊNCIA", "Personalize a identidade visual do Auren.");
+        addSection(content, "APARÊNCIA", "Personalize a identidade visual da Nexauren.");
 
         LinearLayout themeCard = card();
         TextView themeTitle = text("Tema", 16, ThemeManager.resolve(this, R.color.text_primary));
@@ -111,7 +111,7 @@ public class SettingsActivity extends ComponentActivity {
         addSection(content, "ATUALIZAÇÕES", "Distribuição gratuita enquanto a Google Play fica para o futuro.");
 
         LinearLayout updates = card();
-        updates.addView(text("Auren Updates", 16, ThemeManager.resolve(this, R.color.text_primary)));
+        updates.addView(text("Nexauren Updates", 16, ThemeManager.resolve(this, R.color.text_primary)));
         updates.addView(text(
                 "Verifica o GitHub Releases. Quando houver uma versão nova, o Android pode abrir o instalador para concluir a atualização.",
                 13, ThemeManager.resolve(this, R.color.text_secondary)), margins(0, 5, 0, 10));
@@ -145,7 +145,7 @@ public class SettingsActivity extends ComponentActivity {
         LinearLayout about = rounded(ThemeManager.resolve(this, R.color.accent_mint), 22);
         about.setPadding(dp(16), dp(15), dp(16), dp(15));
         TextView aboutText = text(
-                "Auren Music Player\nLocal • Privado • Personalizável\nVersão " + BuildConfig.VERSION_NAME,
+                "Nexauren Music Player\nLocal • Privado • Personalizável\nVersão " + BuildConfig.VERSION_NAME,
                 13, ThemeManager.resolve(this, R.color.text_primary));
         aboutText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         about.addView(aboutText);
