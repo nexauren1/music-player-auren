@@ -347,7 +347,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout list = column();
 
         if (tracks.isEmpty()) {
-            list.addView(emptyCard("Nenhuma música encontrada no dispositivo. Toque em "Atualizar biblioteca" no menu."));
+            list.addView(emptyCard("Nenhuma música encontrada no dispositivo. Toque em \"Atualizar biblioteca\" no menu."));
         } else {
             for (int i = 0; i < tracks.size(); i++) {
                 list.addView(trackRow(tracks.get(i), 0));
