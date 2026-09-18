@@ -1850,7 +1850,7 @@ public class MainActivity extends ComponentActivity {
         if (tag instanceof Long) {
             boolean playing = currentTrack != null && ((Long) tag) == currentTrack.id;
             view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                    getColor(playing ? R.color.playing_background : R.color.card)));
+                    ThemeManager.resolve(this, playing ? R.color.playing_background : R.color.card)));
             if (view instanceof ViewGroup) {
                 ViewGroup group = (ViewGroup) view;
                 for (int i = 0; i < group.getChildCount(); i++) {
