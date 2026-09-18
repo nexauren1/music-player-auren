@@ -164,6 +164,10 @@ public class MainActivity extends ComponentActivity {
         requestMusicPermission();
         handler.post(progressUpdater);
         UpdateManager.checkForUpdates(this);
+        if (savedInstanceState == null && getIntent() != null
+                && getIntent().getStringExtra("nexauren_update_action") != null) {
+            handleUpdateIntent(getIntent());
+        }
         if (savedInstanceState == null && intentHasUpdateAction(getIntent())) {
             handleUpdateIntent(getIntent());
         }
@@ -205,8 +209,15 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleUpdateIntent(intent);
+    }
+
     @Override protected void onResume() {
         super.onResume();
+        UpdateManager.tryInstallPendingUpdate(this);
         ThemeManager.applyWindow(this);
         String key = themeKey();
         if (appliedThemeKey != null && !appliedThemeKey.equals(key) && !isFinishing()) {
