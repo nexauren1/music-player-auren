@@ -383,7 +383,7 @@ public final class AchievementManager {
         result.add(new Badge(
                 "thousand_minutes",
                 "1000 minutos",
-                "Passe das 1000 horas? Não: 1000 minutos de audição.",
+                "Passe 1000 minutos de audição.",
                 "1000 min",
                 totalMs >= 1000L * 60_000L));
 
