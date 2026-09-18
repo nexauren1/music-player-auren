@@ -416,7 +416,7 @@ public final class UpdateManager {
                 file);
 
         Intent installer =
-                new Intent(Intent.ACTION_VIEW);
+                new Intent(Intent.ACTION_INSTALL_PACKAGE);
 
         installer.setDataAndType(
                 uri,
