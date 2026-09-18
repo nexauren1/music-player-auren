@@ -10,6 +10,8 @@ import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -24,6 +26,7 @@ import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.PopupMenu;
+import android.widget.ProgressBar;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -94,6 +97,10 @@ public class MainActivity extends ComponentActivity {
     private Track currentTrack;
     private ImageButton miniPlay;
     private ImageButton miniFavorite;
+    private SeekBar miniProgress;
+    private SeekBar nowPlayingSeek;
+    private TextView nowPlayingPosition;
+    private TextView nowPlayingDuration;
     private ImageView miniArt;
     private TextView miniTitle;
     private TextView miniArtist;
@@ -221,7 +228,7 @@ public class MainActivity extends ComponentActivity {
         menu.setOnClickListener(v -> showAppMenu(menu));
         bar.addView(menu, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
-        TextView title = text("Auren Music", 20, R.color.text_primary);
+        TextView title = text("Nexauren", 20, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         bar.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1));
 
@@ -253,7 +260,7 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout info = column();
         info.setPadding(dp(14), 0, 0, 0);
-        TextView eyebrow = text("AGORA NO AUREN", 10, android.R.color.white);
+        TextView eyebrow = text("AGORA NO NEXAUREN", 10, android.R.color.white);
         eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         info.addView(eyebrow);
 
@@ -290,7 +297,7 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout header = row();
         LinearLayout brandBox = column();
-        TextView small = text("AUREN MUSIC", 11, R.color.auren_primary);
+        TextView small = text("NEXAUREN", 11, R.color.auren_primary);
         small.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         TextView title = text("Boa música,\nsempre.", 30, R.color.text_primary);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -337,6 +344,7 @@ public class MainActivity extends ComponentActivity {
                 homeStats.unlocked + "/" + homeStats.totalAchievements + " desbloqueadas",
                 v -> showAchievements());
         content.addView(homeAchievementCard(), margins(0, 0, 0, 2));
+        content.addView(intelligenceHomeCard(), margins(0, 0, 0, 12));
 
         // AUREN_ALL_SONGS_HOME_START
         addSectionHeader(content, "Todas as músicas", tracks.size() + " músicas", v -> showLibrary());
@@ -433,7 +441,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private View librarySectionCard(String title, String subtitle, String icon, View.OnClickListener listener) {
-        LinearLayout card = rounded(Color.WHITE, 20);
+        LinearLayout card = rounded(ThemeManager.card(this), 20);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(14), dp(12), dp(12), dp(12));
         card.setElevation(dp(2));
@@ -455,6 +463,456 @@ public class MainActivity extends ComponentActivity {
         card.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(48)));
         card.setOnClickListener(listener);
         return card;
+    }
+
+
+    private void showJourney() {
+        showAchievements();
+    }
+
+    private void showAchievementToast() {
+        Toast toast = Toast.makeText(this, "✨ Conquista desbloqueada!", Toast.LENGTH_SHORT);
+        toast.show();
+    }
+
+    private View intelligenceHomeCard() {
+        AurenAnalytics.Summary s = AurenAnalytics.summary(this);
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
+        card.setPadding(dp(15), dp(13), dp(15), dp(13));
+        TextView title = text("NEXAUREN INTELLIGENCE", 10, R.color.auren_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(title);
+        TextView main = text(
+                s.streakCurrent > 0 ? "Sequência de " + s.streakCurrent + " dia(s)" : "Comece a criar o seu histórico",
+                16, R.color.text_primary);
+        main.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(main, margins(0, 4, 0, 2));
+        card.addView(text(
+                AurenAnalytics.formatDuration(s.todayMs) + " hoje • " + AurenAnalytics.formatDuration(s.monthMs) + " este mês",
+                11, R.color.text_secondary));
+        TextView action = text("Abrir estatísticas e Journey  ›", 12, R.color.auren_primary);
+        action.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(action, margins(0, 8, 0, 0));
+        card.setOnClickListener(v -> showAnalyticsDashboard());
+        return card;
+    }
+
+    private void showAnalyticsDashboard() {
+        showAnalyticsDashboard("month");
+    }
+
+    private void showAnalyticsDashboard(String range) {
+        pageContainer.removeAllViews();
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = column();
+        content.setPadding(dp(20), dp(18), dp(20), dp(26));
+
+        TextView eyebrow = text("NEXAUREN INTELLIGENCE", 11, R.color.auren_primary);
+        eyebrow.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(eyebrow);
+        TextView title = text("Estatísticas", 30, R.color.text_primary);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(title, margins(0, 3, 0, 6));
+        content.addView(text("Hoje → Semana → Mês → Sempre", 13, R.color.text_secondary), margins(0, 0, 0, 14));
+
+        LinearLayout tabs = row();
+        String[] labels = {"Hoje", "Semana", "Mês", "Sempre"};
+        String[] ids = {"today", "week", "month", "all"};
+        for (int i = 0; i < labels.length; i++) {
+            final String target = ids[i];
+            TextView tab = chip(labels[i], target.equals(range));
+            tab.setOnClickListener(v -> showAnalyticsDashboard(target));
+            tabs.addView(tab, new LinearLayout.LayoutParams(0, dp(42), 1));
+        }
+        content.addView(tabs, margins(0, 0, 0, 14));
+
+        AurenAnalytics.Summary s = AurenAnalytics.summary(this);
+        long time = "today".equals(range) ? s.todayMs : "week".equals(range) ? s.weekMs
+                : "all".equals(range) ? s.totalMs : s.monthMs;
+        int plays = "today".equals(range) ? s.todayPlays : "week".equals(range) ? s.weekPlays
+                : "all".equals(range) ? s.totalPlays : s.monthPlays;
+
+        LinearLayout stats = row();
+        stats.addView(statCard("TEMPO", AurenAnalytics.formatDuration(time), "ouvido"), new LinearLayout.LayoutParams(0, dp(100), 1));
+        stats.addView(statCard("REPRODUÇÕES", String.valueOf(plays), "neste período"), margins(8, 0, 0, 0));
+        content.addView(stats);
+
+        LinearLayout stats2 = row();
+        AchievementManager.Stats a = AchievementManager.stats(this);
+        stats2.addView(statCard("SEQUÊNCIA", a.streakCurrentLabel(), "Auren Journey"), new LinearLayout.LayoutParams(0, dp(92), 1));
+        stats2.addView(statCard("MÚSICAS", String.valueOf(a.uniqueTracks), "diferentes"), margins(8, 0, 0, 0));
+        content.addView(stats2, margins(0, 8, 0, 14));
+
+        content.addView(featureSectionTitle("Top 5 músicas por tempo ouvido"));
+        List<AurenAnalytics.TrackScore> topTracks = AurenAnalytics.topTracks(this, analyticsTracks(), 5);
+        if (topTracks.isEmpty()) content.addView(emptyCard("Ainda não há tempo suficiente para um ranking."));
+        for (AurenAnalytics.TrackScore t : topTracks) content.addView(trackAnalyticsRow(t));
+
+        content.addView(featureSectionTitle("Top artistas"));
+        for (AurenAnalytics.AggregateScore a1 : AurenAnalytics.aggregateByArtist(this, analyticsTracks(), 5))
+            content.addView(simpleAnalyticsRow(a1.name, AurenAnalytics.formatDuration(a1.timeMs)));
+
+        content.addView(featureSectionTitle("Top álbuns"));
+        for (AurenAnalytics.AggregateScore a2 : AurenAnalytics.aggregateByAlbum(this, analyticsTracks(), 5))
+            content.addView(simpleAnalyticsRow(a2.name, AurenAnalytics.formatDuration(a2.timeMs)));
+
+        content.addView(featureSectionTitle("Top géneros"));
+        for (AurenAnalytics.AggregateScore a3 : AurenAnalytics.aggregateByGenre(this, analyticsTracks(), 5))
+            content.addView(simpleAnalyticsRow(a3.name, AurenAnalytics.formatDuration(a3.timeMs)));
+
+        content.addView(featureSectionTitle("O que ouvi ontem à noite"));
+        boolean foundNight = false;
+        long nowMs = System.currentTimeMillis();
+        for (AurenAnalytics.Session session : AurenAnalytics.sessions(this)) {
+            long age = nowMs - session.startMs;
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.setTimeInMillis(session.startMs);
+            int hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
+            if (age >= 0 && age <= 7L * 86400000L && (hour >= 20 || hour < 5)) {
+                foundNight = true;
+                content.addView(sessionRow(session));
+            }
+            if (foundNight && content.getChildCount() > 45) break;
+        }
+        if (!foundNight) content.addView(emptyCard("Quando houver uma sessão noturna, ela aparecerá aqui."));
+
+        content.addView(featureSectionTitle("Favoritos automáticos"));
+        for (Track t : automaticFavoriteTracks())
+            content.addView(trackInsightRow(t, "Tendência automática"));
+        content.addView(featureSectionTitle("Repartição visual"));
+        content.addView(analyticsBars(s.todayMs, s.weekMs, s.monthMs));
+
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+    }
+
+    private View trackAnalyticsRow(AurenAnalytics.TrackScore track) {
+        LinearLayout row = rounded(ThemeManager.card(this), 16);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(9), dp(12), dp(9));
+        TextView name = text(track.title, 14, R.color.text_primary);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView artist = text(track.artist, 11, R.color.text_secondary);
+        LinearLayout info = column();
+        info.addView(name);
+        info.addView(artist, margins(0, 2, 0, 0));
+        row.addView(info, new LinearLayout.LayoutParams(0, dp(48), 1));
+        TextView time = text(AurenAnalytics.formatDuration(track.timeMs), 11, R.color.auren_primary);
+        time.setGravity(Gravity.CENTER);
+        row.addView(time, new LinearLayout.LayoutParams(dp(78), dp(48)));
+        row.setOnClickListener(v -> {
+            Track t = findTrack(track.id);
+            if (t != null) play(t);
+        });
+        return row;
+    }
+
+    private View simpleAnalyticsRow(String name, String value) {
+        LinearLayout row = rounded(ThemeManager.card(this), 16);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(9), dp(12), dp(9));
+        TextView n = text(name.isEmpty() ? "Desconhecido" : name, 14, R.color.text_primary);
+        n.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        row.addView(n, new LinearLayout.LayoutParams(0, dp(44), 1));
+        row.addView(text(value, 11, R.color.auren_primary), new LinearLayout.LayoutParams(dp(78), dp(44)));
+        return row;
+    }
+
+    private View trackInsightRow(Track track, String label) {
+        LinearLayout row = rounded(ThemeManager.resolve(this, R.color.accent_soft), 16);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(9), dp(12), dp(9));
+        TextView n = text(safeTitle(track), 14, R.color.text_primary);
+        n.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        row.addView(n, new LinearLayout.LayoutParams(0, dp(46), 1));
+        row.addView(text(label, 11, R.color.auren_primary), new LinearLayout.LayoutParams(dp(125), dp(46)));
+        row.setOnClickListener(v -> play(track));
+        return row;
+    }
+
+    private View sessionRow(AurenAnalytics.Session session) {
+        java.text.DateFormat df = new java.text.SimpleDateFormat("dd/MM HH:mm", Locale.getDefault());
+        LinearLayout row = rounded(ThemeManager.card(this), 16);
+        row.setPadding(dp(12), dp(9), dp(12), dp(9));
+        int count = session.trackIds.isEmpty() ? 0 : session.trackIds.split(",").length;
+        row.addView(text(df.format(new java.util.Date(session.startMs)) + " • " + count + " músicas",
+                13, R.color.text_primary));
+        row.addView(text(AurenAnalytics.formatDuration(session.durationMs), 11, R.color.auren_primary),
+                margins(0, 3, 0, 0));
+        return row;
+    }
+
+    private View analyticsBars(long today, long week, long month) {
+        LinearLayout box = rounded(ThemeManager.card(this), 18);
+        box.setPadding(dp(14), dp(12), dp(14), dp(12));
+        long[] values = {today, week / 7L, month / 30L};
+        String[] labels = {"Hoje", "Média semanal", "Média mensal"};
+        long max = Math.max(1L, Math.max(values[0], Math.max(values[1], values[2])));
+        for (int i = 0; i < values.length; i++) {
+            LinearLayout line = row();
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.addView(text(labels[i], 12, R.color.text_secondary), new LinearLayout.LayoutParams(dp(96), dp(34)));
+            ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            bar.setMax(100);
+            bar.setProgress((int)Math.max(3L, Math.min(100L, values[i] * 100L / max)));
+            bar.setProgressTintList(android.content.res.ColorStateList.valueOf(ThemeManager.accent(this)));
+            line.addView(bar, new LinearLayout.LayoutParams(0, dp(28), 1));
+            box.addView(line);
+        }
+        return box;
+    }
+
+    private List<TrackInfo> analyticsTracks() {
+        List<TrackInfo> result = new ArrayList<>();
+        for (Track t : tracks) result.add(new TrackInfo(t.id, safeTitle(t), safeArtist(t), safeAlbum(t), safeGenre(t)));
+        return result;
+    }
+
+    private List<Track> automaticFavoriteTracks() {
+        List<Track> result = new ArrayList<>();
+        for (Track t : tracks) {
+            int plays = playCounts.getOrDefault(t.id, 0);
+            long minutes = AurenAnalytics.trackTime(this, t.id) / 60000L;
+            if (plays >= 3 || minutes >= 15L) result.add(t);
+        }
+        Collections.sort(result, (x, y) -> {
+            long sx = AurenAnalytics.trackTime(this, x.id) + playCounts.getOrDefault(x.id, 0) * 60000L;
+            long sy = AurenAnalytics.trackTime(this, y.id) + playCounts.getOrDefault(y.id, 0) * 60000L;
+            return Long.compare(sy, sx);
+        });
+        return result.subList(0, Math.min(8, result.size()));
+    }
+
+    private LinearLayout featureScreen(String title, String subtitle) {
+        LinearLayout content = column();
+        content.setPadding(dp(20), dp(18), dp(20), dp(26));
+        TextView e = text("NEXAUREN", 11, R.color.auren_primary);
+        e.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(e);
+        TextView t = text(title, 30, R.color.text_primary);
+        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        content.addView(t, margins(0, 3, 0, 3));
+        content.addView(text(subtitle, 13, R.color.text_secondary), margins(0, 0, 0, 16));
+        return content;
+    }
+
+    private void startQueue(List<Track> source) {
+        playQueue.clear();
+        if (source == null || source.isEmpty()) return;
+        List<Track> selected = new ArrayList<>(source);
+        Track first = selected.remove(0);
+        int max = Math.min(12, selected.size());
+        for (int i = 0; i < max; i++) playQueue.add(selected.get(i));
+        play(first);
+    }
+
+    private void showAurenMix() {
+        pageContainer.removeAllViews();
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = featureScreen("Auren Mix", "Uma sequência inteligente, baseada no seu comportamento e no horário.");
+        List<Track> queue = buildSmartQueue();
+        content.addView(featureAction("▶", "Iniciar Mix", "Reorganizar as próximas músicas agora", v -> {
+            List<Track> fresh = buildSmartQueue();
+            startQueue(fresh);
+        }), margins(0, 0, 0, 14));
+        content.addView(featureSectionTitle("Próximas músicas"));
+        if (queue.isEmpty()) content.addView(emptyCard("Adicione músicas ao dispositivo para criar o Mix."));
+        for (Track t : queue) {
+            content.addView(trackInsightRow(t,
+                    "hora " + AurenAnalytics.hourScore(this, t.id,
+                            java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY))
+                            + " • " + playCounts.getOrDefault(t.id, 0) + " plays"));
+        }
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+    }
+
+    private List<Track> buildSmartQueue() {
+        playQueue.clear();
+        List<Track> pool = new ArrayList<>(tracks);
+        final int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        Collections.sort(pool, (a, b) -> {
+            long as = AurenAnalytics.hourScore(this, a.id, hour) * 100000L
+                    + playCounts.getOrDefault(a.id, 0) * 5000L
+                    + AurenAnalytics.trackTime(this, a.id) / 1000L;
+            long bs = AurenAnalytics.hourScore(this, b.id, hour) * 100000L
+                    + playCounts.getOrDefault(b.id, 0) * 5000L
+                    + AurenAnalytics.trackTime(this, b.id) / 1000L;
+            return Long.compare(bs, as);
+        });
+        if (currentTrack != null) pool.remove(currentTrack);
+        int count = Math.min(12, pool.size());
+        List<Track> selected = new ArrayList<>(pool.subList(0, count));
+        if (selected.size() > 3) Collections.shuffle(selected);
+        playQueue.addAll(selected);
+        return selected;
+    }
+
+    private void showAurenFocus() {
+        String[] options = {"15 minutos", "30 minutos", "45 minutos", "60 minutos"};
+        new AlertDialog.Builder(this)
+                .setTitle("Auren Focus")
+                .setMessage("Uma sessão limpa, com música local e temporizador opcional. Escolha a duração.")
+                .setItems(options, (dialog, which) -> {
+                    int[] mins = {15, 30, 45, 60};
+                    sleepTimerEndMs = System.currentTimeMillis() + mins[which] * 60_000L;
+                    sleepAtTrackEnd = false;
+                    List<Track> queue = buildSmartQueue();
+                    if (player == null) return;
+                    if (player.isPlaying()) {
+                        Toast.makeText(this, "Focus iniciado por " + mins[which] + " minutos.", Toast.LENGTH_SHORT).show();
+                    } else if (currentTrack != null) {
+                        player.play();
+                    } else if (!queue.isEmpty()) {
+                        startQueue(queue);
+                    }
+                })
+                .show();
+    }
+
+    private void showAurenMemories() {
+        pageContainer.removeAllViews();
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = featureScreen("Auren Memories", "Pequenas memórias da sua própria biblioteca.");
+        AurenAnalytics.Summary s = AurenAnalytics.summary(this);
+        content.addView(featureMetricCard("Nos últimos 7 dias", AurenAnalytics.formatDuration(s.weekMs), s.weekPlays + " reproduções"));
+        content.addView(featureSectionTitle("O que ouvi ontem à noite"));
+        long now = System.currentTimeMillis();
+        int shown = 0;
+        for (AurenAnalytics.Session session : AurenAnalytics.sessions(this)) {
+            long age = now - session.startMs;
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.setTimeInMillis(session.startMs);
+            int hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
+            if (age >= 0 && age <= 8L * 86400000L && (hour >= 20 || hour < 5)) {
+                content.addView(sessionRow(session));
+                if (++shown >= 8) break;
+            }
+        }
+        if (shown == 0) content.addView(emptyCard("Ainda não há uma sessão noturna guardada."));
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+    }
+
+    private void showAurenReplay() {
+        pageContainer.removeAllViews();
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = featureScreen("Auren Replay", "O resumo musical do seu mês.");
+        AurenAnalytics.Summary s = AurenAnalytics.summary(this);
+        content.addView(featureMetricCard("Este mês", AurenAnalytics.formatDuration(s.monthMs), s.monthPlays + " reproduções"));
+        content.addView(featureMetricCard("Sempre", AurenAnalytics.formatDuration(s.totalMs), s.totalPlays + " reproduções"),
+                margins(0, 8, 0, 8));
+        content.addView(featureSectionTitle("Top 5"));
+        for (AurenAnalytics.TrackScore t : AurenAnalytics.topTracks(this, analyticsTracks(), 5))
+            content.addView(trackAnalyticsRow(t));
+        content.addView(featureSectionTitle("Journey"));
+        content.addView(simpleAnalyticsRow("Sequência atual", s.streakCurrent + " dia(s)"));
+        content.addView(simpleAnalyticsRow("Melhor sequência", s.streakBest + " dia(s)"));
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+    }
+
+    private void showAurenDiscovery() {
+        pageContainer.removeAllViews();
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = featureScreen("Auren Discovery", "Descubra o que a sua biblioteca ainda esconde.");
+        List<Track> list = new ArrayList<>(tracks);
+        Collections.sort(list, (a, b) -> {
+            long at = AurenAnalytics.trackTime(this, a.id);
+            long bt = AurenAnalytics.trackTime(this, b.id);
+            int ap = playCounts.getOrDefault(a.id, 0);
+            int bp = playCounts.getOrDefault(b.id, 0);
+            int cmp = Long.compare(at, bt);
+            return cmp != 0 ? cmp : Integer.compare(ap, bp);
+        });
+        content.addView(featureAction("⌕", "Descobrir agora", "Colocar músicas pouco ouvidas na fila", v -> startQueue(list)),
+                margins(0, 0, 0, 14));
+        for (int i = 0; i < Math.min(15, list.size()); i++) {
+            Track t = list.get(i);
+            String label = playCounts.getOrDefault(t.id, 0) == 0 ? "Nunca tocada" :
+                    playCounts.get(t.id) + " reproduções";
+            content.addView(trackInsightRow(t, label));
+        }
+        scroll.addView(content);
+        pageContainer.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
+    }
+
+    private void showAurenMood() {
+        String[] moods = {"Energético", "Calmo", "Noite", "Viagem", "Foco", "Aleatório"};
+        new AlertDialog.Builder(this)
+                .setTitle("Auren Mood")
+                .setMessage("Escolha um ambiente. A fila usa apenas a música que já existe no aparelho.")
+                .setItems(moods, (dialog, which) -> {
+                    List<Track> queue = buildMoodQueue(moods[which]);
+                    if (queue.isEmpty()) {
+                        Toast.makeText(this, "Não encontrei músicas suficientes.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    if (which == moods.length - 1) Collections.shuffle(queue);
+                    startQueue(queue);
+                    Toast.makeText(this, "Auren Mood: " + moods[which], Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private List<Track> buildMoodQueue(String mood) {
+        List<Track> result = new ArrayList<>();
+        String key = mood.toLowerCase(Locale.US);
+        for (Track t : tracks) {
+            String value = (safeTitle(t) + " " + safeArtist(t) + " " + safeAlbum(t) + " " + safeGenre(t)).toLowerCase(Locale.US);
+            boolean match =
+                    key.equals("energético") && containsAny(value, "dance", "party", "energy", "remix", "club", "house", "beat", "summer") ||
+                    key.equals("calmo") && containsAny(value, "calm", "acoustic", "piano", "ambient", "sleep", "soft", "relax") ||
+                    key.equals("noite") && containsAny(value, "night", "midnight", "moon", "dream", "after dark") ||
+                    key.equals("viagem") && containsAny(value, "road", "travel", "trip", "drive", "journey", "summer") ||
+                    key.equals("foco") && containsAny(value, "focus", "instrumental", "study", "lofi", "ambient");
+            if (match) result.add(t);
+        }
+        if (result.size() < 3) {
+            result = new ArrayList<>(tracks);
+            Collections.sort(result, (a, b) -> Long.compare(AurenAnalytics.trackTime(this, a.id), AurenAnalytics.trackTime(this, b.id)));
+        }
+        Collections.shuffle(result);
+        if (currentTrack != null) result.remove(currentTrack);
+        return result.subList(0, Math.min(12, result.size()));
+    }
+
+    private boolean containsAny(String value, String... keys) {
+        for (String k : keys) if (value.contains(k)) return true;
+        return false;
+    }
+
+    private View featureAction(String icon, String title, String subtitle, View.OnClickListener listener) {
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        TextView i = text(icon, 24, R.color.auren_primary);
+        i.setGravity(Gravity.CENTER);
+        card.addView(i, new LinearLayout.LayoutParams(dp(48), dp(52)));
+        LinearLayout info = column();
+        TextView t = text(title, 15, R.color.text_primary);
+        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        info.addView(t);
+        info.addView(text(subtitle, 11, R.color.text_secondary), margins(0, 3, 0, 0));
+        card.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+        card.setOnClickListener(listener);
+        return card;
+    }
+
+    private View featureMetricCard(String label, String value, String detail) {
+        LinearLayout card = rounded(ThemeManager.resolve(this, R.color.accent_soft), 20);
+        card.setPadding(dp(15), dp(13), dp(15), dp(13));
+        TextView l = text(label, 10, R.color.auren_primary);
+        l.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(l);
+        TextView v = text(value, 23, R.color.text_primary);
+        v.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(v, margins(0, 3, 0, 0));
+        card.addView(text(detail, 11, R.color.text_secondary), margins(0, 2, 0, 0));
+        return card;
+    }
+
+    private View artworkAccentPlaceholder() {
+        return null;
     }
 
     private void showRecent() {
@@ -628,7 +1086,16 @@ public class MainActivity extends ComponentActivity {
         addDrawerItem(items, "↗", "Mais tocadas", () -> { dialog.dismiss(); showMostPlayed(); });
         addDrawerItem(items, "◷", "Recentes", () -> { dialog.dismiss(); showRecent(); });
         addDrawerItem(items, "✦", "Sugestões", () -> { dialog.dismiss(); showSuggestions(); });
-        addDrawerItem(items, "★", "Conquistas & recordes", () -> { dialog.dismiss(); showAchievements(); });
+        addDrawerItem(items, "★", "Auren Journey", () -> { dialog.dismiss(); showJourney(); });
+
+        addDrawerSection(items, "NEXAUREN INTELLIGENCE");
+        addDrawerItem(items, "◉", "Estatísticas completas", () -> { dialog.dismiss(); showAnalyticsDashboard(); });
+        addDrawerItem(items, "✦", "Auren Mix", () -> { dialog.dismiss(); showAurenMix(); });
+        addDrawerItem(items, "◌", "Auren Focus", () -> { dialog.dismiss(); showAurenFocus(); });
+        addDrawerItem(items, "◷", "Auren Memories", () -> { dialog.dismiss(); showAurenMemories(); });
+        addDrawerItem(items, "↻", "Auren Replay", () -> { dialog.dismiss(); showAurenReplay(); });
+        addDrawerItem(items, "⌕", "Auren Discovery", () -> { dialog.dismiss(); showAurenDiscovery(); });
+        addDrawerItem(items, "◈", "Auren Mood", () -> { dialog.dismiss(); showAurenMood(); });
 
         addDrawerSection(items, "FERRAMENTAS");
         addDrawerItem(items, "≋", "Equalizador", () -> {
@@ -676,7 +1143,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout item = row();
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(14), dp(8), dp(12), dp(8));
-        item.setBackgroundColor(Color.WHITE);
+        item.setBackgroundColor(ThemeManager.card(this));
 
         TextView iconView = text(icon, 22, R.color.text_secondary);
         iconView.setGravity(Gravity.CENTER);
@@ -695,7 +1162,7 @@ public class MainActivity extends ComponentActivity {
 
     private void showAboutDialog() {
         new AlertDialog.Builder(this)
-                .setTitle("Auren Music")
+                .setTitle("Nexauren Music Player")
                 .setMessage("Um player de música moderno, feito para a sua biblioteca local.\n\nVersion " + BuildConfig.VERSION_NAME + "\n\nMusic that moves with you.")
                 .setPositiveButton("Fechar", null)
                 .show();
@@ -754,9 +1221,15 @@ public class MainActivity extends ComponentActivity {
         mini.setElevation(dp(10));
         mini.setPadding(0, 0, 0, dp(1));
 
-        View progress = new View(this);
-        progress.setBackgroundColor(ThemeManager.resolve(this, R.color.auren_primary));
-        mini.addView(progress, new LinearLayout.LayoutParams(-1, dp(3)));
+        miniProgress = new SeekBar(this);
+        miniProgress.setMax(1000);
+        miniProgress.setEnabled(false);
+        miniProgress.setPadding(0, 0, 0, 0);
+        miniProgress.setProgressTintList(android.content.res.ColorStateList.valueOf(ThemeManager.accent(this)));
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            miniProgress.setThumbTintList(android.content.res.ColorStateList.valueOf(ThemeManager.accent(this)));
+        }
+        mini.addView(miniProgress, new LinearLayout.LayoutParams(-1, dp(7)));
 
         LinearLayout row = row();
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -852,9 +1325,13 @@ public class MainActivity extends ComponentActivity {
     }
     private View buildNowPlayingView() {
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(ThemeManager.resolve(this, R.color.surface));
+        int artworkColor = artworkAccentColor(currentTrack);
+        scroll.setBackgroundColor(ThemeManager.blend(
+                artworkColor, ThemeManager.surface(this), ThemeManager.isDark(this) ? 0.18f : 0.10f));
 
         LinearLayout root = column();
+        root.setBackground(roundDrawable(ThemeManager.blend(
+                artworkColor, ThemeManager.surface(this), ThemeManager.isDark(this) ? 0.24f : 0.075f), 28));
         root.setPadding(dp(20), dp(16), dp(20), dp(22));
 
         LinearLayout top = row();
@@ -930,6 +1407,7 @@ public class MainActivity extends ComponentActivity {
         root.addView(titleRow);
 
         SeekBar seek = new SeekBar(this);
+        nowPlayingSeek = seek;
         seek.setMax(1000);
         seek.setProgressTintList(android.content.res.ColorStateList.valueOf(
                 ThemeManager.resolve(this, R.color.auren_primary)));
@@ -953,6 +1431,8 @@ public class MainActivity extends ComponentActivity {
         LinearLayout times = row();
         TextView position = text(formatTime(player.getCurrentPosition()), 11, R.color.text_secondary);
         TextView duration = text(formatTime(player.getDuration()), 11, R.color.text_secondary);
+        nowPlayingPosition = position;
+        nowPlayingDuration = duration;
         duration.setGravity(Gravity.RIGHT);
         times.addView(position, new LinearLayout.LayoutParams(0, dp(22), 1));
         times.addView(duration, new LinearLayout.LayoutParams(0, dp(22), 1));
@@ -993,9 +1473,24 @@ public class MainActivity extends ComponentActivity {
                 new LinearLayout.LayoutParams(0, dp(58), 1));
         extras.addView(playerAction("☰", "Fila", v -> showQueueDialog()),
                 new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("⌁", "Mix", v -> showAurenMix()),
+                new LinearLayout.LayoutParams(0, dp(58), 1));
+        extras.addView(playerAction("⚙", "Equalizador", v -> startActivity(
+                        new Intent(this, EqualizerActivity.class))),
+                new LinearLayout.LayoutParams(0, dp(58), 1));
         root.addView(extras, margins(0, 8, 0, 0));
 
-        TextView hint = text("Auren • Música que acompanha você", 11, R.color.text_secondary);
+        LinearLayout featureRow = row();
+        featureRow.setGravity(Gravity.CENTER);
+        featureRow.addView(playerAction("★", "Journey", v -> showJourney()),
+                new LinearLayout.LayoutParams(0, dp(52), 1));
+        featureRow.addView(playerAction("◷", "Focus", v -> showAurenFocus()),
+                new LinearLayout.LayoutParams(0, dp(52), 1));
+        featureRow.addView(playerAction("◈", "Mood", v -> showAurenMood()),
+                new LinearLayout.LayoutParams(0, dp(52), 1));
+        root.addView(featureRow, margins(0, 6, 0, 0));
+
+        TextView hint = text("Nexauren • Música que acompanha você", 11, R.color.text_secondary);
         hint.setGravity(Gravity.CENTER);
         root.addView(hint, margins(0, 10, 0, 0));
 
@@ -1120,12 +1615,44 @@ public class MainActivity extends ComponentActivity {
                 .show();
     }
 
+    private int artworkAccentColor(Track track) {
+        int fallback = ThemeManager.accent(this);
+        if (track == null) return fallback;
+        try {
+            ImageView probe = artwork(1);
+            probe.setImageURI(track.albumArtUri());
+            if (probe.getDrawable() instanceof BitmapDrawable) {
+                Bitmap bitmap = ((BitmapDrawable) probe.getDrawable()).getBitmap();
+                if (bitmap != null && bitmap.getWidth() > 2 && bitmap.getHeight() > 2) {
+                    int stepX = Math.max(1, bitmap.getWidth() / 8);
+                    int stepY = Math.max(1, bitmap.getHeight() / 8);
+                    long r = 0, g = 0, b = 0, n = 0;
+                    for (int x = 0; x < bitmap.getWidth(); x += stepX) {
+                        for (int y = 0; y < bitmap.getHeight(); y += stepY) {
+                            int px = bitmap.getPixel(x, y);
+                            r += Color.red(px); g += Color.green(px); b += Color.blue(px); n++;
+                        }
+                    }
+                    if (n > 0) return Color.rgb((int)(r/n), (int)(g/n), (int)(b/n));
+                }
+            }
+        } catch (Exception ignored) {}
+        return fallback;
+    }
+
     private void closeNowPlaying() {
         if (nowPlayingDialog != null && nowPlayingDialog.isShowing()) nowPlayingDialog.dismiss();
     }
 
     private void updateNowPlayingProgress() {
-        // The dialog is intentionally rebuilt only for navigation; progress is kept by the player.
+        if (player == null) return;
+        long duration = Math.max(0L, player.getDuration());
+        long position = Math.max(0L, player.getCurrentPosition());
+        if (nowPlayingSeek != null && duration > 0L && !userDragging) {
+            nowPlayingSeek.setProgress(Math.max(0, Math.min(1000, (int) (position * 1000L / duration))));
+        }
+        if (nowPlayingPosition != null) nowPlayingPosition.setText(formatTime(position));
+        if (nowPlayingDuration != null) nowPlayingDuration.setText(formatTime(duration));
     }
 
     private void previousTrackInPlayer() {
@@ -1259,7 +1786,11 @@ public class MainActivity extends ComponentActivity {
             recentTracks.remove(track);
             recentTracks.add(0, track);
             while (recentTracks.size() > 20) recentTracks.remove(recentTracks.size() - 1);
+            AurenAnalytics.recordPlayStart(this, track.id, safeArtist(track));
+            int beforeUnlocked = AchievementManager.stats(this).unlocked;
             AchievementManager.recordPlay(this, track.id);
+            int afterUnlocked = AchievementManager.stats(this).unlocked;
+            if (afterUnlocked > beforeUnlocked) showAchievementToast();
         }
         persistListeningState(track);
 
@@ -1338,6 +1869,10 @@ public class MainActivity extends ComponentActivity {
         miniArt.setImageURI(currentTrack.albumArtUri());
         if (miniArt.getDrawable() == null) miniArt.setImageResource(android.R.drawable.ic_media_play);
         boolean playing = player != null && player.isPlaying();
+        if (miniProgress != null && player != null && player.getDuration() > 0L) {
+            miniProgress.setProgress(Math.max(0, Math.min(1000,
+                    (int) (player.getCurrentPosition() * 1000L / player.getDuration()))));
+        }
         miniPlay.setImageResource(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
         miniPlay.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
                 ThemeManager.resolve(this, R.color.auren_primary)));
@@ -1452,6 +1987,20 @@ public class MainActivity extends ComponentActivity {
     }
 
 
+    private String readGenre(long audioId) {
+        try {
+            Uri uri = MediaStore.Audio.Genres.getContentUriForAudioId("external", (int) audioId);
+            String[] projection = {MediaStore.Audio.Genres.NAME};
+            try (Cursor cursor = getContentResolver().query(uri, projection, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    String genre = cursor.getString(0);
+                    return genre == null ? "" : genre.trim();
+                }
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
     private void loadMusic() {
         tracks.clear();
         String[] projection = {
@@ -1459,6 +2008,7 @@ public class MainActivity extends ComponentActivity {
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.ARTIST,
                 MediaStore.Audio.Media.ALBUM_ID,
+                MediaStore.Audio.Media.ALBUM,
                 MediaStore.Audio.Media.DURATION
         };
         String selection = MediaStore.Audio.Media.IS_MUSIC + " != 0";
@@ -1470,12 +2020,15 @@ public class MainActivity extends ComponentActivity {
                 MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")) {
             if (cursor != null) {
                 while (cursor.moveToNext()) {
+                    long id = cursor.getLong(0);
                     tracks.add(new Track(
-                            cursor.getLong(0),
+                            id,
                             cursor.getString(1),
                             cursor.getString(2),
                             cursor.getLong(3),
-                            cursor.getLong(4)));
+                            cursor.getString(4),
+                            readGenre(id),
+                            cursor.getLong(5)));
                 }
             }
         }
@@ -1827,6 +2380,14 @@ public class MainActivity extends ComponentActivity {
         t.setGravity(Gravity.CENTER);
         card.addView(t, margins(16, 18, 16, 18));
         return card;
+    }
+
+    private String safeAlbum(Track track) {
+        return track == null || track.album == null || track.album.trim().isEmpty() ? "Álbum desconhecido" : track.album.trim();
+    }
+
+    private String safeGenre(Track track) {
+        return track == null || track.genre == null || track.genre.trim().isEmpty() ? "Género não informado" : track.genre.trim();
     }
 
     private String safeTitle(Track track) {
@@ -2330,18 +2891,37 @@ public class MainActivity extends ComponentActivity {
     }
 
 
+    public static final class TrackInfo {
+        public final long id;
+        public final String title;
+        public final String artist;
+        public final String album;
+        public final String genre;
+        public TrackInfo(long id, String title, String artist, String album, String genre) {
+            this.id = id;
+            this.title = title;
+            this.artist = artist;
+            this.album = album;
+            this.genre = genre;
+        }
+    }
+
     private static class Track {
         final long id;
         final String title;
         final String artist;
         final long albumId;
+        final String album;
+        final String genre;
         final long durationMs;
 
-        Track(long id, String title, String artist, long albumId, long durationMs) {
+        Track(long id, String title, String artist, long albumId, String album, String genre, long durationMs) {
             this.id = id;
             this.title = title;
             this.artist = artist;
             this.albumId = albumId;
+            this.album = album;
+            this.genre = genre;
             this.durationMs = durationMs;
         }
 
