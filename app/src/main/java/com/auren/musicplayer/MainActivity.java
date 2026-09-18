@@ -1358,6 +1358,7 @@ public class MainActivity extends ComponentActivity {
         applyLibrarySort();
         restoreListeningState();
         if (pageContainer != null) showHome();
+        updateMiniPlayer();
     }
 
     private void showQueueDialog() {
