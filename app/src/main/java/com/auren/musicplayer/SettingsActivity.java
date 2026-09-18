@@ -184,54 +184,75 @@ public class SettingsActivity extends ComponentActivity {
     }
 
     private void showAccentPaletteDialog() {
-        int[][] palette = {
-                {Color.rgb(37, 99, 235), "Azul".hashCode()},
-                {Color.rgb(6, 182, 212), "Azul ciano".hashCode()},
-                {Color.rgb(29, 78, 216), "Azul escuro".hashCode()},
-                {Color.rgb(124, 58, 237), "Roxo".hashCode()},
-                {Color.rgb(99, 102, 241), "Índigo".hashCode()},
-                {Color.rgb(236, 72, 153), "Rosa".hashCode()},
-                {Color.rgb(239, 68, 68), "Vermelho".hashCode()},
-                {Color.rgb(249, 115, 22), "Laranja".hashCode()},
-                {Color.rgb(234, 179, 8), "Amarelo".hashCode()},
-                {Color.rgb(34, 197, 94), "Verde".hashCode()},
-                {Color.rgb(16, 185, 129), "Esmeralda".hashCode()},
-                {Color.rgb(20, 184, 166), "Turquesa".hashCode()}
+        int[] palette = {
+                Color.rgb(37, 99, 235),
+                Color.rgb(6, 182, 212),
+                Color.rgb(29, 78, 216),
+                Color.rgb(124, 58, 237),
+                Color.rgb(99, 102, 241),
+                Color.rgb(236, 72, 153),
+                Color.rgb(239, 68, 68),
+                Color.rgb(249, 115, 22),
+                Color.rgb(234, 179, 8),
+                Color.rgb(34, 197, 94),
+                Color.rgb(16, 185, 129),
+                Color.rgb(20, 184, 166)
         };
-        String[] names = {"Azul", "Azul ciano", "Azul escuro", "Roxo", "Índigo", "Rosa", "Vermelho", "Laranja", "Amarelo", "Verde", "Esmeralda", "Turquesa"};
+        String[] names = {
+                "Azul", "Azul ciano", "Azul escuro", "Roxo", "Índigo", "Rosa",
+                "Vermelho", "Laranja", "Amarelo", "Verde", "Esmeralda", "Turquesa"
+        };
 
-        android.widget.GridLayout grid = new android.widget.GridLayout(this);
-        grid.setColumnCount(2);
+        LinearLayout grid = column();
         int current = ThemeManager.accent(this);
-        for (int i = 0; i < palette.length; i++) {
-            int color = palette[i][0];
-            TextView swatch = new TextView(this);
-            swatch.setText(names[i] + "\n" + ThemeManager.hex(color) + (isSameColor(color, current) ? "  ✓" : ""));
-            swatch.setTextSize(14);
-            swatch.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            swatch.setTextColor(contrast(color));
-            swatch.setGravity(Gravity.CENTER);
-            swatch.setPadding(dp(10), dp(10), dp(10), dp(10));
-            swatch.setBackground(roundDrawable(color, 18));
-            swatch.setContentDescription(names[i] + " " + ThemeManager.hex(color));
-            swatch.setOnClickListener(v -> applyAccentInPlace(color));
-            android.widget.GridLayout.LayoutParams lp = new android.widget.GridLayout.LayoutParams();
-            lp.width = 0;
-            lp.height = dp(78);
-            lp.columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f);
-            lp.setMargins(dp(5), dp(5), dp(5), dp(5));
-            grid.addView(swatch, lp);
+        for (int rowIndex = 0; rowIndex < palette.length; rowIndex += 2) {
+            LinearLayout colorRow = row();
+            for (int columnIndex = rowIndex; columnIndex < Math.min(rowIndex + 2, palette.length); columnIndex++) {
+                int color = palette[columnIndex];
+                TextView swatch = new TextView(this);
+                swatch.setText(names[columnIndex] + "\n" + ThemeManager.hex(color)
+                        + (isSameColor(color, current) ? "  ✓" : ""));
+                swatch.setTextSize(14);
+                swatch.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                swatch.setTextColor(contrast(color));
+                swatch.setGravity(Gravity.CENTER);
+                swatch.setPadding(dp(10), dp(10), dp(10), dp(10));
+                swatch.setBackground(roundDrawable(color, 18));
+                swatch.setContentDescription(names[columnIndex] + " " + ThemeManager.hex(color));
+
+                LinearLayout.LayoutParams swatchLp = new LinearLayout.LayoutParams(0, dp(78), 1);
+                if (columnIndex > rowIndex) swatchLp.setMargins(dp(8), 0, 0, 0);
+                colorRow.addView(swatch, swatchLp);
+            }
+            grid.addView(colorRow, margins(0, 5, 0, 5));
         }
 
         ScrollView scroll = new ScrollView(this);
         scroll.setPadding(dp(4), dp(4), dp(4), dp(4));
         scroll.addView(grid);
+
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Escolher uma cor")
                 .setMessage("Escolha uma cor pronta. O código HEX aparece em cada opção.")
                 .setView(scroll)
                 .setNegativeButton("Fechar", null)
                 .create();
+
+        for (int rowIndex = 0; rowIndex < grid.getChildCount(); rowIndex++) {
+            View rowView = grid.getChildAt(rowIndex);
+            if (!(rowView instanceof LinearLayout)) continue;
+            LinearLayout colorRow = (LinearLayout) rowView;
+            for (int columnIndex = 0; columnIndex < colorRow.getChildCount(); columnIndex++) {
+                TextView swatch = (TextView) colorRow.getChildAt(columnIndex);
+                int paletteIndex = rowIndex * 2 + columnIndex;
+                if (paletteIndex >= palette.length) continue;
+                int color = palette[paletteIndex];
+                swatch.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    applyAccentInPlace(color);
+                });
+            }
+        }
         dialog.show();
     }
 
