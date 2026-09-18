@@ -221,6 +221,28 @@ public final class AurenAnalytics {
                 "plays_track_" + trackId, 0);
     }
 
+    /** Behaviour-based signal; never changes the user's manual favourites. */
+    public static boolean isAutoFavorite(Context context, long trackId) {
+        if (trackId <= 0) return false;
+        int plays = trackPlayCount(context, trackId);
+        long listened = trackTime(context, trackId);
+        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        int hourPlays = hourScore(context, trackId, hour);
+        return plays >= 5 || listened >= 20L * 60_000L || hourPlays >= 3;
+    }
+
+    public static int favoriteConfidence(Context context, long trackId) {
+        if (trackId <= 0) return 0;
+        int plays = trackPlayCount(context, trackId);
+        long listened = trackTime(context, trackId);
+        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        int hourPlays = hourScore(context, trackId, hour);
+        int score = Math.min(100, plays * 10);
+        score = Math.max(score, (int)Math.min(100L, listened / 12_000L));
+        score = Math.max(score, Math.min(100, hourPlays * 20));
+        return score;
+    }
+
     public static long lastPlayedAt(Context context, long trackId) {
         return prefs(context).getLong(
                 "last_play_track_at_" + trackId,
