@@ -750,18 +750,19 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void showAurenFocus() {
-        String[] options = {"15 minutos", "30 minutos", "45 minutos", "60 minutos"};
+        String[] options = {"Sem temporizador", "15 minutos", "30 minutos", "45 minutos", "60 minutos"};
         new AlertDialog.Builder(this)
                 .setTitle("Auren Focus")
-                .setMessage("Uma sessão limpa, com música local e temporizador opcional. Escolha a duração.")
+                .setMessage("Uma sessão limpa, com música local. O temporizador é opcional.")
                 .setItems(options, (dialog, which) -> {
-                    int[] mins = {15, 30, 45, 60};
-                    sleepTimerEndMs = System.currentTimeMillis() + mins[which] * 60_000L;
+                    int[] mins = {0, 15, 30, 45, 60};
                     sleepAtTrackEnd = false;
+                    sleepTimerEndMs = mins[which] == 0 ? 0L
+                            : System.currentTimeMillis() + mins[which] * 60_000L;
                     List<Track> queue = buildSmartQueue();
                     if (player == null) return;
                     if (player.isPlaying()) {
-                        Toast.makeText(this, "Focus iniciado por " + mins[which] + " minutos.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, mins[which] == 0 ? "Focus iniciado sem temporizador." : "Focus iniciado por " + mins[which] + " minutos.", Toast.LENGTH_SHORT).show();
                     } else if (currentTrack != null) {
                         player.play();
                     } else if (!queue.isEmpty()) {
@@ -1660,6 +1661,9 @@ public class MainActivity extends ComponentActivity {
         refreshNowPlaying();
     }
     private void nextTrackInPlayer() {
+        if (playQueue.isEmpty() && tracks.size() > 1) {
+            buildSmartQueue();
+        }
         if (!playQueue.isEmpty()) {
             Track next = playQueue.remove(0);
             if (sleepAtTrackEnd) {
@@ -1777,6 +1781,9 @@ public class MainActivity extends ComponentActivity {
 
         boolean newPlayEvent = !sameTrack || ended;
         boolean restoringTrack = sameTrack && player.getMediaItemCount() == 0 && !ended;
+        if (!sameTrack && player.getMediaItemCount() > 0 && currentTrack != null) {
+            persistResumePosition();
+        }
         currentTrack = track;
         if (newPlayEvent) {
             playCounts.put(track.id, playCounts.getOrDefault(track.id, 0) + 1);
@@ -1987,6 +1994,32 @@ public class MainActivity extends ComponentActivity {
     }
 
 
+    private void updateAlbumAchievement() {
+        if (tracks.isEmpty()) return;
+        java.util.Map<String, Integer> totalByAlbum = new java.util.HashMap<>();
+        java.util.Map<String, Integer> playedByAlbum = new java.util.HashMap<>();
+        for (Track t : tracks) {
+            String album = safeAlbum(t);
+            totalByAlbum.put(album, totalByAlbum.getOrDefault(album, 0) + 1);
+            if (playCounts.getOrDefault(t.id, 0) > 0) {
+                playedByAlbum.put(album, playedByAlbum.getOrDefault(album, 0) + 1);
+            }
+        }
+        boolean complete = false;
+        for (String album : totalByAlbum.keySet()) {
+            if (totalByAlbum.get(album) != null
+                    && totalByAlbum.get(album) >= 2
+                    && playedByAlbum.getOrDefault(album, 0) >= totalByAlbum.get(album)) {
+                complete = true;
+                break;
+            }
+        }
+        getSharedPreferences("auren_player", MODE_PRIVATE).edit()
+                .putBoolean("album_complete", complete
+                        || getSharedPreferences("auren_player", MODE_PRIVATE).getBoolean("album_complete", false))
+                .apply();
+    }
+
     private String readGenre(long audioId) {
         try {
             Uri uri = MediaStore.Audio.Genres.getContentUriForAudioId("external", (int) audioId);
@@ -2034,6 +2067,7 @@ public class MainActivity extends ComponentActivity {
         }
         applyLibrarySort();
         restoreListeningState();
+        updateAlbumAchievement();
         if (pageContainer != null) showHome();
         updateMiniPlayer();
         restorePlaybackSession();
@@ -2729,6 +2763,13 @@ public class MainActivity extends ComponentActivity {
         journeyMetrics.addView(statCard("SEQUÊNCIA", journey.streakCurrent + " dia(s)", "dias seguidos"),
                 margins(8, 0, 0, 0));
         content.addView(journeyMetrics, margins(0, 8, 0, 0));
+
+        AurenAnalytics.Summary levelSummary = AurenAnalytics.summary(this);
+        int journeyLevel = 1 + (levelSummary.totalPlays / 25);
+        int levelProgress = levelSummary.totalPlays % 25;
+        content.addView(featureMetricCard("NÍVEL " + journeyLevel,
+                levelProgress + "/25",
+                "reproduções para o próximo nível"), margins(0, 8, 0, 0));
 
         content.addView(text(
                 stats.totalPlays + " reproduções • " + stats.uniqueTracks + " músicas diferentes • "
